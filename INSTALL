@@ -1,0 +1,24 @@
+This project uses autoconf.
+
+If you are building directly from the repository, then the configure script
+will need to be generated.  If you are building from a tarball distribution,
+and a `configure` script already exists, you can skip this step.
+
+    $ autoreconf --verbose --install --symlink
+
+Then run the generated `configure` script:
+
+    $ ./configure
+
+Or, if a dedicated "build" directory is desired, create one and perform
+the configure in there, e.g.
+
+    $ mkdir build && cd build && ../configure
+
+Then run make to compile the sources:
+
+    $ make -j
+
+Then install (probably as root):
+
+    # make install

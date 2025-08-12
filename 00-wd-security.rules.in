@@ -1,0 +1,37 @@
+#
+# Unlock Western Digital external drives locked using WD Security
+# software.
+#
+# Create a key-file for the external drive having the following form and
+# place it in /etc/keys:
+#
+#     WD_${product}_${serial}.key
+#
+# The product name and serial number can be determined using `udevadm`:
+#
+#     $ udevadm info --query=property \
+#         --property='ID_USB_MODEL,ID_USB_SERIAL_SHORT' /dev/sdX
+#     ID_USB_MODEL=My_Passport_0820
+#     ID_USB_SERIAL_SHORT=12345678901234567C89012C
+#
+# Using the above values, the key-file should be named:
+#
+#     WD_My_Passport_0820_12345678901234567C89012C.key
+#
+# If a key-file exists for a locked external drive, then `wd-security`
+# will be called to unlock it.
+
+SUBSYSTEM=="block", ACTION=="add", ATTR{removable}=="0", TEST!="partition", \
+	SUBSYSTEMS=="usb", ATTRS{idVendor}=="1058", \
+	OPTIONS="string_escape=replace", \
+	ENV{.WD_SECURITY_ID}="WD_$attr{product}_$attr{serial}", \
+	GOTO="wd_security_unlock"
+
+GOTO="wd_security_end"
+
+LABEL="wd_security_unlock"
+PROGRAM=="/usr/bin/test -f '/etc/keys/$env{.WD_SECURITY_ID}.key'", \
+	PROGRAM=="@bindir@/wd-security status --is-locked /dev/%k", \
+	RUN+="@bindir@/wd-security unlock --rescan --key-file '/etc/keys/$env{.WD_SECURITY_ID}.key' /dev/%k"
+
+LABEL="wd_security_end"

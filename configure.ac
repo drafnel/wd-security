@@ -29,7 +29,9 @@ AC_CHECK_LIB([crypto], [EVP_MD_fetch], [],
 	     [AC_CHECK_LIB([crypto], [EVP_sha256], [],
 	     [AC_MSG_ERROR([unable to find usable crypto library])])])
 
-AC_SEARCH_LIBS([getrandom], [c], [], [])
+# Try to use getrandom, then arc4random, then internal impl.
+AC_SEARCH_LIBS([getrandom], [c], [],
+	       [AC_SEARCH_LIBS([arc4random_buf], [c bsd], [], [])])
 
 AC_SEARCH_LIBS([iconv], [c], [],
 	       [AC_MSG_ERROR([unable to find iconv])])
@@ -39,8 +41,14 @@ AC_SEARCH_LIBS([clock_gettime], [c rt], [],
 
 # Checks for header files.
 AC_HEADER_ASSERT
+dnl AC_SYS_POSIX_TERMIOS
 
 AC_CHECK_HEADERS([endian.h fcntl.h linux/fs.h openssl/crypto.h openssl/evp.h scsi/scsi.h scsi/sg.h stddef.h stdlib.h string.h sys/ioctl.h sys/random.h unistd.h])
+
+AS_IF([test "x$ac_cv_search_arc4random_buf" != "x" -a \
+       "x$ac_cv_search_arc4random_buf" != "xno"],
+      [AC_CHECK_FUNCS([arc4random_buf])
+       AC_CHECK_HEADERS([bsd/stdlib.h])])
 
 # Checks for typedefs, structures, and compiler characteristics.
 AC_C_CONST

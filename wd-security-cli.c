@@ -59,7 +59,7 @@
 #define HINT_MAX_CHARS 101
 #define HINT_MAX_BYTES 202
 
-#define DEFAULT_ITER_TIME 1500
+#define DEFAULT_ITER_TIME 2000
 
 /* Flags for use with prompt_user() */
 #define NOECHO 1

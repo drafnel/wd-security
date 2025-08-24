@@ -1,7 +1,8 @@
 /*
  * wd-security-cli.c
  *
- * Manage security of Western Digital My Book / My Passport devices.
+ *   Manage the password protection of external drives supported by the
+ *   proprietary WD Security software.
  *
  * Copyright (C) 2025  Brandon Casey
  *

@@ -1,7 +1,7 @@
 /*
  * compat.h
  *
- * Compatibility functions.
+ *   Compatibility functions.
  *
  * Copyright (C) 2025  Brandon Casey
  */

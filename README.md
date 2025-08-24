@@ -33,11 +33,11 @@ On Linux, udev can be used to list all Western Digital drives using the
 Vendor ID "1058".
 
 ```
-$ udevadm info --export-db \
-               --subsystem-match=block \
-               --attr-nomatch='partition=*' \
-               --attr-match='removable=0' \
-               --property-match=ID_USB_VENDOR_ID="1058"
+udevadm info --export-db \
+             --subsystem-match=block \
+             --attr-nomatch='partition=*' \
+             --attr-match='removable=0' \
+             --property-match=ID_USB_VENDOR_ID="1058"
 ```
 
 The `wd-security-devices.sh` script will print the results in a format
@@ -78,7 +78,7 @@ By default, shows the encryption status of the device (i.e. whether it
 is locked, unlocked, or unprotected).
 
 ```
-$ wd-security status /dev/sdX
+wd-security status /dev/sdX
 ```
 
 If the `--is-locked` switch is passed, then the normal output will be
@@ -91,7 +91,7 @@ with a non-zero status otherwise.
 Unlock a password protected device.
 
 ```
-$ wd-security unlock /dev/sdX
+wd-security unlock /dev/sdX
 ```
 
 If a password is not supplied, then it will be prompted for.
@@ -116,7 +116,7 @@ specifying the `--disable-protection` switch (or just '--disable').
 Additionally, the Security Block of the Handy Store will be cleared.
 
 ```
-$ wd-security change-pw [--disable-protection] /dev/sdX
+wd-security change-pw [--disable-protection] /dev/sdX
 ```
 
 If the old and/or new passwords (as appropriate) are not specified, then
@@ -135,7 +135,7 @@ possibly insecure, factory DEK[^1].
 > become lost and completely unrecoverable.
 
 ```
-$ wd-security erase /dev/sdX
+wd-security erase /dev/sdX
 ```
 
 ### Show Handy Store
@@ -148,7 +148,7 @@ called the Handy Store.
 Use the `handy-store` sub-command to display or modify it.
 
 ```
-$ wd-security handy-store /dev/sdX
+wd-security handy-store /dev/sdX
 ```
 
 ## Auto-unlocking on device attach
@@ -183,9 +183,9 @@ encoding should be written to the file.  This can be done using the
 `iconv` utility to convert the UTF-8 encoded password into UTF-16LE:
 
 ```
-$ echo -n 'my-secret-password' >utf8-password.txt
-$ iconv -f UTF-8 -t UTF-16LE -o name-of-keyfile.key utf8-password.txt
-$ rm utf8-password.txt
+echo -n 'my-secret-password' >utf8-password.txt
+iconv -f UTF-8 -t UTF-16LE -o name-of-keyfile.key utf8-password.txt
+rm utf8-password.txt
 ```
 
 ### Place key-file in /etc/keys
@@ -195,15 +195,15 @@ unlock the device by specifying the key-file to the `unlock`
 sub-command:
 
 ```
-$ wd-security unlock --key-file /path/to/my/keyfile.key /dev/sdX
+wd-security unlock --key-file /path/to/my/keyfile.key /dev/sdX
 ```
 
 Once the key-file has been confirmed to work, place it in /etc/keys so
 it can be found by the udev rule:
 
 ```
-$ cp WD_mode_serial.key /etc/keys
-$ chmod 400 /etc/keys/WD_mode_serial.key
+cp WD_mode_serial.key /etc/keys
+chmod 400 /etc/keys/WD_mode_serial.key
 ```
 
 ### Unplug/Plug device in, confirm that it is unlocked automatically

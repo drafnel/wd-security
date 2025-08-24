@@ -1510,10 +1510,7 @@ static int unlock_cmd (int argc, char * const argv[]) {
 	}
 
 	err = unlock(wds, salt, salt_bytes, pw, pw_bytes, iterations);
-	if (err) {
-		fprintf(stderr, "Error: failed to unlock device: %s\n",
-				wds_strerror(err));
-	} else if (write_handy_store) {
+	if (!err && write_handy_store) {
 		if (salt_bytes != sizeof(sb.salt)) {
 			fprintf(stderr, "Error: salt is not 8-bytes, cannot"
 					"write to Handy Store\n");

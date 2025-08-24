@@ -1215,8 +1215,8 @@ static void handy_store_cmd_help (const char *name) {
 	       "--capacity         show capacity\n"
 	       "--set-label        set the drive label\n"
 	       "--set-hint         set the password hint\n"
-	       "--no-detect        don't detect wdpassport-utils.py\n"
-	       "--force-wdp-utils  force wdpassport-utils.py quirks\n"
+	       "--no-wdp-utils     don't detect wdpassport-utils.py\n"
+	       "--wdp-utils        force wdpassport-utils.py quirks\n"
 	       "--verbose          increase verbosity\n"
 	       "--help             this text\n"
 	       "\n");
@@ -1235,8 +1235,8 @@ static int handy_store_cmd (int argc, char * const argv[]) {
 		{ "capacity", no_argument, NULL, 'C' },
 		{ "set-label", required_argument, NULL, 'L' },
 		{ "set-hint", required_argument, NULL, 'H' },
-		{ "no-detect", no_argument, NULL, 'N' },
-		{ "force-wdp-utils", no_argument, NULL, 'W' },
+		{ "no-wdp-utils", no_argument, NULL, 'N' },
+		{ "wdp-utils", no_argument, NULL, 'W' },
 		{ NULL, 0, 0, 0 }
 	};
 	const char *label_arg = NULL;
@@ -1393,8 +1393,8 @@ static void unlock_cmd_help (const char *name) {
 	       "                     Overrides Handy Store.\n"
 	       "--write-handy-store  write salt/iterations to Handy Store\n"
 	       "--rescan             reread partition table after unlock\n"
-	       "--no-detect          don't detect wdpassport-utils.py\n"
-	       "--force-wdp-utils    force wdpassport-utils.py quirks\n"
+	       "--no-wdp-utils       don't detect wdpassport-utils.py\n"
+	       "--wdp-utils          force wdpassport-utils.py quirks\n"
 	       "--verbose            increase verbosity\n"
 	       "--help               this text\n"
 	       "\n");
@@ -1428,8 +1428,8 @@ static int unlock_cmd (int argc, char * const argv[]) {
 		{ "salt-file", required_argument, NULL, 'S' },
 		{ "iterations", required_argument, NULL, 'i' },
 		{ "write-handy-store", no_argument, NULL, 'w' },
-		{ "no-detect", no_argument, NULL, 'N' },
-		{ "force-wdp-utils", no_argument, NULL, 'W' },
+		{ "no-wdp-utils", no_argument, NULL, 'N' },
+		{ "wdp-utils", no_argument, NULL, 'W' },
 		{ "rescan", no_argument, NULL, 'R' },
 		{ NULL, 0, 0, 0 }
 	};
@@ -1643,8 +1643,8 @@ static void changepw_cmd_help (const char *name) {
 	       "                       protection.  Overrides Handy Store.\n"
 	       "--iter-time <ms>       milliseconds for hash iteration rounds\n"
 	       "                       (default: " str(DEFAULT_ITER_TIME) ")\n"
-	       "--no-detect            don't detect wdpassport-utils.py\n"
-	       "--force-wdp-utils      force wdpassport-utils.py quirks\n"
+	       "--no-wdp-utils         don't detect wdpassport-utils.py\n"
+	       "--wdp-utils            force wdpassport-utils.py quirks\n"
 	       "--verbose              increase verbosity\n"
 	       "--help                 this text\n"
 	       "\n");
@@ -1692,8 +1692,8 @@ static int changepw_cmd (int argc, char * const argv[]) {
 		{ "salt-file", required_argument, NULL, 'S' },
 		{ "iterations", required_argument, NULL, 'i' },
 		{ "iter-time", required_argument, NULL, 'I'},
-		{ "no-detect", no_argument, NULL, 'N' },
-		{ "force-wdp-utils", no_argument, NULL, 'W' },
+		{ "no-wdp-utils", no_argument, NULL, 'N' },
+		{ "wdp-utils", no_argument, NULL, 'W' },
 		{ NULL, 0, 0, 0 }
 	};
 

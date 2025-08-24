@@ -77,6 +77,8 @@
 
 /* wdpassport-utils.py hint string */
 #define WDPASSPORT_UTILS_PY_HINT "wdpassport-utils                                                                                                                                                                                          "
+#define WDPASSPORT_UTILS_PY_WARNING \
+	"Warning: enabling wdpassport-utils.py compatibility quirks.\n"
 #define AUTO_DETECT      0x00
 #define NO_DETECT        0x01
 #define FORCE_WDP_UTILS  0x02
@@ -928,6 +930,9 @@ static void read_security_block_nofail (wds_handle *wds,
 	} else if (detect_wdputils == FORCE_WDP_UTILS ||
 		   (detect_wdputils == AUTO_DETECT &&
 		    is_wdpassport_utils(sb->hint))) {
+
+		fputs(WDPASSPORT_UTILS_PY_WARNING, stderr);
+
 		/*
 		 * The wdpassport-utils.py script stores the salt in the
 		 * Handy Store Security Block as an ASCII string, but
@@ -1133,8 +1138,7 @@ static int show_handy_store_security_block (FILE *fp, struct wds_handle *wds,
 		size_t salt_len = sizeof(sb.salt);
 		char *salt;
 
-		fprintf(stderr, "Warning: Security Block created by "
-				"wdpassport-utils.py, enabling quirks.\n");
+		fputs(WDPASSPORT_UTILS_PY_WARNING, stderr);
 
 		sb.salt[1] = sb.salt[3] = sb.salt[5] = sb.salt[7] = 0;
 		salt = utf16le_to_utf8(sb.salt, salt_len, &salt_len);

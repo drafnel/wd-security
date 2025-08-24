@@ -79,8 +79,8 @@
 #define WDPASSPORT_UTILS_PY_HINT "wdpassport-utils                                                                                                                                                                                          "
 #define WDPASSPORT_UTILS_PY_WARNING \
 	"Warning: enabling wdpassport-utils.py compatibility quirks.\n"
-#define AUTO_DETECT      0x00
-#define NO_DETECT        0x01
+#define NO_DETECT        0x00
+#define AUTO_DETECT      0x01
 #define FORCE_WDP_UTILS  0x02
 
 static char *progname;

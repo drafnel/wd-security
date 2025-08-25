@@ -41,7 +41,6 @@ AC_SEARCH_LIBS([clock_gettime], [c rt], [],
 
 # Checks for header files.
 AC_HEADER_ASSERT
-dnl AC_SYS_POSIX_TERMIOS
 
 AC_CHECK_HEADERS([endian.h fcntl.h linux/fs.h openssl/crypto.h openssl/evp.h scsi/scsi.h scsi/sg.h stddef.h stdlib.h string.h sys/ioctl.h sys/random.h unistd.h])
 

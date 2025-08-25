@@ -59,7 +59,11 @@ AC_TYPE_UINT8_T
 AC_TYPE_UINT16_T
 AC_TYPE_UINT32_T
 
-AC_CHECK_DECLS([BLKRRPART], [], [], [[#include <linux/fs.h>]])
+AC_CHECK_DECLS([BLKRRPART], [], [], [[
+	#ifdef HAVE_LINUX_FS_H
+	#include <linux/fs.h>
+	#endif
+]])
 
 # Checks for library functions.
 AC_FUNC_MALLOC

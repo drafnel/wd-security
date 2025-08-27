@@ -12,7 +12,7 @@ AC_CONFIG_AUX_DIR([build-aux])
 AM_INIT_AUTOMAKE([foreign])
 
 # GCC 64-bit
-: ${CFLAGS="-W -Wall -O2"}
+AS_VAR_SET_IF([CFLAGS], [], [AS_VAR_SET([CFLAGS], ["-W -Wall -O2"])])
 
 # Checks for programs.
 AC_PROG_CC
@@ -47,10 +47,10 @@ AC_HEADER_ASSERT
 
 AC_CHECK_HEADERS([endian.h fcntl.h linux/fs.h openssl/crypto.h openssl/evp.h scsi/scsi.h scsi/sg.h stddef.h stdlib.h string.h sys/ioctl.h sys/random.h unistd.h])
 
-AS_IF([test "x$ac_cv_search_arc4random_buf" != "x" -a \
-       "x$ac_cv_search_arc4random_buf" != "xno"],
-      [AC_CHECK_FUNCS([arc4random_buf])
-       AC_CHECK_HEADERS([bsd/stdlib.h])])
+AS_VAR_SET_IF([ac_cv_search_arc4random_buf],
+	      [AS_VAR_IF([ac_cv_search_arc4random_buf], ["no"], [],
+			 [AC_CHECK_FUNCS([arc4random_buf])
+			 AC_CHECK_HEADERS([bsd/stdlib.h])])])
 
 # Checks for typedefs, structures, and compiler characteristics.
 AC_C_CONST

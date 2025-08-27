@@ -1,0 +1,570 @@
+= wd-security(1)
+Brandon Casey <@PACKAGE_BUGREPORT@>
+:doctype: manpage
+:manmanual: General Commands Manual
+:mansource: @PACKAGE_NAME@
+:manversion: @PACKAGE_VERSION@
+:homepage: @PACKAGE_URL@
+
+== Name
+
+wd-security - unlock, set password, erase encrypted WD external drives
+
+== Synopsis
+
+*wd-security* [*--help*] *status*|*unlock*|*change-pw*|*erase* _device_
+
+== Description
+
+Manage password protection of Western Digital external drives supported
+by the proprietary WD Security software.
+
+== Common Options
+
+The following options are supported by the main executable and all
+sub-commands.
+
+*--help*, *-h*::
+  Show help.
+
+*--verbose*, *-v*::
+  Increase verbosity.
+
+== Sub-Commands
+
+*version*::
+
+Show version information.
+
+*help* [_SUB-COMMAND_]::
+
+Show overview of available sub-commands or usage of a specific
+_SUB-COMMAND_.
+
+*status* [_OPTIONS_] _device_::
+
+Show encryption status of _device_.
+
+  OPTIONS:::
+
+    *--is-locked*::::
+      Suppress normal output and exit with zero status if _device_ is
+      locked, nonzero otherwise.
+
+*unlock* [_OPTIONS_] _device_::
+
+Unlock _device_.
++
+The password will be prompted for and converted to UTF-16LE to ensure
+compatibility with the proprietary WD Security software.
+
+  OPTIONS:::
+
+    *--password* _password_::::
+      Use _password_ as the unlock password.  The supplied _password_
+      may not be empty and will be converted to UTF-16LE encoding.
+
+    *--key-file* _filename_::::
+      Use contents of _filename_ as password.  The entire file will be
+      read and used as-is for the password.
+
+    *--salt* _salt_::::
+      Use _salt_ as the password salt.  The supplied _salt_ will be
+      converted to UTF-16LE.  Overrides the password salt stored in the
+      Handy Store Security Block, if it exists, or the default password
+      salt.
+
+    *--salt-file* _filename_::::
+      Use the contents of _filename_ as the password salt.  The entire
+      file will be read and used as-is for the password salt.  Overrides
+      the password salt stored in the Handy Store Security Block, if it
+      exists, or the default password salt.
+
+    *--iterations* _iterations_::::
+      Perform _iterations_ hash iterations to generate the Key Encryption
+      Key (KEK).  Overrides the iterations stored in the Handy Store
+      Security Block, if it exists, or the default iterations.
+
+    *--write-handy-store*::::
+      If _device_ is successfully unlocked, write the password salt and
+      iterations to the Handy Store Security Block.  This is useful when
+      the values in the current Security Block do not represent the
+      correct values needed to unlock the _device_.  For example, if the
+      proprietary WD Security software was used to change the password
+      when the password salt and iterations were other than the defaults.
+      See <<_broken_behavior_when_changing_password>> below for an
+      explanation.
+
+    *--rescan*::::
+      If _device_ is successfully unlocked, notify the kernel that the
+      partition table should be re-read.
+
+    *--no-wdp-utils*::::
+      Don't try to detect whether wdpassport-utils.py was used to
+      generate the Handy Store Security Block or enable compatibility
+      quirks.
+
+    *--wdp-utils*::::
+      Force-enable compatibility quirks for wdpassport-utils.py.
+
+*change-pw* [_OPTIONS_] _device_::
+
+Enable/disable/change encryption status of _device_.
++
+The old and/or new passwords will be prompted for, as appropriate and
+converted to UTF-16LE to ensure compatibility with the proprietary WD
+Security software.
+
+  OPTIONS:::
+
+    *--disable-protection*::::
+      Disable password protection.
+
+    *--no-clear*::::
+      By default, when password protection is disabled, the Handy Store
+      Security Block will be cleared.  This switch will prevent that
+      operation.
+
+    *--password* _password_::::
+      Use _password_ as the current password.  The supplied _password_
+      may not be empty and will be converted to UTF-16LE encoding.
+
+    *--key-file* _filename_::::
+      Use contents of _filename_ as the current password.  The entire
+      file will be read and used as-is for the password.
+
+    *--new-password* _password_::::
+      Use _password_ as the new password.  The supplied _password_ may
+      not be empty and will be converted to UTF-16LE encoding.
+
+    *--new-key-file* _filename_::::
+      Use contents of _filename_ as the new password.  The entire file
+      will be read and used as-is for the password.
+
+    *--hint* _hint_::::
+      Set _hint_ as the new password hint in the Handy Store Security
+      Block.
+
+    *--salt* _salt_::::
+      Use _salt_ as the password salt.  The supplied _salt_ will be
+      converted to UTF-16LE.  Overrides the password salt stored in the
+      Handy Store Security Block, if it exists, or the default password
+      salt.
++
+NOTE: Truncated or zero-padded to 8-bytes if enabling password
+protection.
+
+    *--salt-file* _filename_::::
+      Use the contents of _filename_ as the password salt.  The entire
+      file will be read and used as-is for the password salt.  Overrides
+      the password salt stored in the Handy Store Security Block, if it
+      exists, or the default password salt.
++
+NOTE: Truncated or zero-padded to 8-bytes if enabling password
+protection.
+
+    *--iterations* _iterations_::::
+      Perform _iterations_ hash iterations to generate the Key Encryption
+      Key (KEK).  Overrides the iterations stored in the Handy Store
+      Security Block, if it exists, or the default iterations.
++
+NOTE: Clamped to 32-bits if enabling password protection.
+
+    *--iter-time* _milliseconds_::::
+      Calculate a value for hash iterations such that the generation of
+      the Key Encryption Key (KEK) will consume _milliseconds_ ms.  The
+      default is `2000` ms.
+
+    *--no-wdp-utils*::::
+      Don't try to detect whether wdpassport-utils.py was used to
+      generate the Handy Store Security Block or enable compatibility
+      quirks.
+
+    *--wdp-utils*::::
+      Force-enable compatibility quirks for wdpassport-utils.py.
+
+*erase* [_OPTIONS_] _device_::
+
+Securely erase _device_.
++
+This is accomplished by causing the device to install a new Device
+Encryption Key (DEK).  Every device should be erased at least once, to
+replace the possibly insecure factory Device Encryption Key (DEK).  See
+<<got-HW-crypto,{ldquo}got HW crypto?{rdquo}>>.
++
+CAUTION: All information on device will become lost and completely
+unrecoverable.
+
+  OPTIONS:::
+
+    *--no-clear*::::
+      By default, when performing a secure erase, the Handy Store
+      Security Block will be cleared.  This switch will prevent that
+      operation.
+
+    *--cipher* _cipher_::::
+      Use the cipher named _cipher_.
+
+    *--cipher-id* _id_::::
+      Use cipher with id _id_.
+
+    *--combine*::::
+      Request mixing encryption key with on-device Random Number
+      Generator.
+
+    *--key-file* _filename_::::
+      Use the contents of _filename_ as the encryption key supplied to
+      device.  <key-size> bytes will be read from _filename_ and used
+      as-is for the encryption key.
+
+    *--key-size* _bytes_::::
+      Force encryption key size to be _bytes_ bytes.  Overrides the
+      value reported by the device.
+
+*handy-store* [_OPTIONS_] _device_::
+
+Show or manipulate the Handy Store of _device_.
++
+The proprietary WD Security software stores encryption parameters in
+special sectors on the drive called the Handy Store.  The first two
+blocks are named the Security Block and the User Block.
+
+  Security Block:::
+
+    Stores the password hint, as well as the salt and number of
+    iteration rounds to use to generate the Key Encryption Key (KEK).
+
+  User Block:::
+
+    Stores a drive label.
+
+  OPTIONS:::
+
+    *--capacity*::::
+      Show capacity of Handy Store.
+
+    *--set-label* _label_::::
+      Set the drive label to _label_.
+
+    *--set-hint* _hint_::::
+      Set the password hint to _hint_.
+
+    *--no-wdp-utils*::::
+      Don't try to detect whether wdpassport-utils.py was used to
+      generate the Handy Store Security Block or enable compatibility
+      quirks.
+
+    *--wdp-utils*::::
+      Force-enable compatibility quirks for wdpassport-utils.py.
+
+== Automatic Unlocking
+
+If the _00-wd-security.rules_ rules file has been installed, then
+*udev*(7) will perform the following operations when a Western Digital
+external drive is attached:
+
+. Check for the existence of a corresponding _Key File_ for the device
+. Check whether the device is locked
+. Attempt to use the _Key File_ to unlock the device
+. Notify the kernel to re-read the partition table of the device
+
+=== Key File Naming
+
+The _Key File_ should be placed in the `/etc/keys` directory and given a
+name containing the model and serial number of the device that it
+corresponds to.  It should have the following form:
+
+----
+WD_MODEL_SERIAL.key
+----
+
+where _MODEL_ refers to the model of the device as reported by udev,
+with all spaces and slashes, etc. converted to underscores, and _SERIAL_
+refers to the serial number of the device.
+
+The *udevadm* utility can be used to determine the appropriate values
+for _MODEL_ and _SERIAL_ as follows:
+
+----
+$ udevadm info --query=property \
+    --property='ID_USB_MODEL,ID_USB_SERIAL_SHORT' /dev/sdX
+ID_USB_MODEL=My_Passport_0820
+ID_USB_SERIAL_SHORT=12345678901234567C89012C
+----
+
+where _sdX_ should be replaced by the name of the device file for your
+device.  Using the above values, the _Key File_ should be named:
+
+----
+WD_My_Passport_0820_12345678901234567C89012C.key
+----
+
+The _wd-security-devices.sh_ script will provide this information in
+an easier to use and more pleasant format.
+
+=== Key File Contents
+
+==== Drive WILL be shared with Windows/MacOS
+
+If the proprietary WD Security software will also be used to unlock the
+device, then the _Key File_ should contain the unlock password encoded
+in UTF-16LE.  The length of the UTF-16LE encoded password should be 25
+characters or less, and not more than 50 bytes in total.
+
+The *iconv*(1) utility can be used to convert a password to UTF-16LE as
+follows:
+
+----
+$ echo -n 'my-secret-password' >password.utf8
+$ iconv -f UTF-8 -t UTF-16LE -o WD_MODEL_SERIAL.key password.utf8
+$ rm password.utf8
+----
+
+==== Drive will NOT be shared with Windows/MacOS
+
+If the proprietary WD Security software will not be used to unlock the
+device, then it is not necessary to impose any restrictions on the
+contents of the _Key File_.  For example, it may be populated with 256
+bytes of random data:
+
+----
+$ dd if=/dev/urandom of=WD_MODEL_SERIAL.key bs=256 count=1
+----
+
+=== Test the Key File
+
+Test the _Key File_ by using it to unlock the device:
+
+----
+$ sudo wd-security unlock --key-file WD_MODEL_SERIAL.key /dev/sdX
+----
+
+=== Install the Key File
+
+Place the _Key File_, with the appropriate name, into the `/etc/keys`
+directory:
+
+----
+$ sudo mkdir -m 700 /etc/keys
+$ sudo cp WD_MODEL_SERIAL.key /etc/keys/
+$ sudo chmod 400 /etc/keys/WD_MODEL_SERIAL.key
+----
+
+Once the _Key File_ is in place, the corresponding device will be
+unlocked automatically when it is attached.
+
+== Examples
+
+.Show security status of /dev/sdb
+====
+----
+# wd-security status /dev/sdb
+Status: (0x01) Locked
+Cipher: (0x30) Full Disk Encryption
+----
+====
+
+.Unlock device and rescan the partition table of /dev/sdb
+====
+----
+# wd-security unlock --rescan /dev/sdb
+Enter password> _My Secret Password_
+Successfully unlocked drive
+----
+====
+
+.Unlock device, overriding salt/iterations and write to Handy Store
+====
+----
+# wd-security unlock --salt 'abcd' --iterations 123456 \
+    --write-handy-store /dev/sdb
+Enter password> _My Secret Password_
+Successfully unlocked drive
+----
+====
+
+.Set the password hint of /dev/sdb
+====
+----
+# wd-security handy-store --set-hint 'My password hint' /dev/sdb
+Writing password hint to Handy Store Security Block...done.
+----
+====
+
+.Set the drive label of /dev/sdb
+====
+----
+# wd-security handy-store --set-label "My Book 25EE (6TB)" /dev/sdb
+Writing drive label to Handy Store Security Block...done.
+----
+====
+
+.Show contents of the Handy Store of /dev/sdb
+====
+----
+# wd-security handy-store /dev/sdb
+ Password Salt: "钋ꪂ㵏좪" 0x8b 0x94 0x82 0xaa 0x4f 0x3d 0xaa 0xc8
+ Password Hint: "My password hint"
+Iteration Rnds: 8635497
+   Drive Label: "My Book 25EE (6TB)"
+----
+====
+
+.Change password using a Key File for the new password
+====
+----
+# wd-security change-pw --new-key-file mykeyfile.key /dev/sdb
+Enter current password (hint: My password hint)> _My Secret Password_
+Enter new password hint> _My New Hint_
+----
+====
+
+.Disable password protection for device /dev/sdb
+====
+----
+# wd-security change-pw --disable-protection /dev/sdb
+Enter current password (hint: My New Hint)> _My Secret Password_
+----
+====
+
+.Securely erase device /dev/sdb
+====
+----
+# wd-security erase /dev/sdb
+Erasing device using the following parameters:
+  Cipher: 0x30 (Full Disk Encryption)
+Key size: 32
+Do not Combine key with on-device RNG
+Continue? [y/N]> _y_
+Clearing Handy Store Security Block...
+----
+====
+
+== Exit Status
+
+*wd-security* exits with a non-zero status on failure and zero for
+success.
+
+== Environment
+
+_WDS_DEBUG_::
+  May be set to an integer to indicate the desired debug level of the
+  *wd-security* library (e.g. 1, 2, 3, etc.).
+  Higher numbers will produce more verbose output.
+
+== Files
+
+_/etc/keys/WD_MODEL_SERIAL.key_::
+  Key File used by *udev*(7) rules to automatically unlock device
+  corresponding to _MODEL_ and _SERIAL_.
+
+_@libdir@/udev/rules.d/00-wd-security.rules_::
+  *udev*(7) rules implementing automatic device unlock.
+
+_@docdir@/wd-security-devices.sh_::
+  Helper script to list attached Western Digital external drives along
+  with the name of the _Key File_ that should be created if automatic
+  unlocking is desired.
+
+== Compatibility Notes
+
+=== Proprietary WD Security software
+
+==== Poor default salt and iteration settings
+
+The default salt and iteration count are "`WDC.`" and `1000`.  The
+proprietary WD Security software _always_ uses these values when
+creating a password.  Not only is `1000` a pathetically low iteration
+count for even ancient CPUs, but using fixed values completely negates
+the value of having a salt and performing multiple rounds of hashing.
+Fixed values means that it is possible to pre-generate a rainbow table
+of all possible (or likely) passwords and use it to instantly unlock any
+drive that has been configured with the proprietary WD Security software
+on Windows or MacOS.
+
+When *wd-security* enables password protection on a device it will
+generate a new 8-byte salt randomly and calculate an appropriate
+iteration count based on timing the hash operation.  This significantly
+increases the difficulty of brute force attempts to derive the unlock
+password and is completely compatible with the proprietary WD Security
+software.
+
+==== Broken behavior when changing password
+
+When the proprietary WD Security software is used to _change_ the
+encryption password, it will do so using the existing salt and iteration
+count configured on the drive, which is the correct behavior.  After
+changing the password, it will then overwrite the existing Security
+Block with the *!!__DEFAULT__!!* salt and iteration count, making it
+impossible to unlock the drive again unless the old salt and iteration
+count are known and can be restored.
+
+For this reason, it is a good idea to backup the salt and iteration
+count.  If these are known, then access to the drive can be restored by
+overriding the salt and iteration count on the *wd-security*
+command-line when unlocking the drive with the new password, and
+optionally restoring the Security Block.
+
+TIP: Never use the proprietary WD Security software to _change_ the
+password.
+
+=== https://github.com/0-duke/wdpassport-utils[wdpassport-utils.py]
+
+==== Broken password salt mangling
+
+wdpassport-utils.py is a Python utility designed for much the same
+purpose as this project, but, unfortunately, it does not handle the
+password salt correctly.
+
+When wdpassport-utils.py sets the password on a device that does not
+have an existing Security Block, it will populate a new Security Block
+with _iterations_ set to the proprietary WD Security default of `1000`,
+and with an 8-byte _salt_ randomly generated from ASCII characters.  So
+far this is less than ideal, but still fine.  The problem arises in the
+way that wdpassport-utils.py processes the password salt.  Instead of
+using all 8-bytes as-is from the Security Block, wdpassport-utils.py
+will first convert the 8-byte salt into a 4-byte salt by dropping every
+other byte.  Then it will treat the 4-byte salt as a 4-character ASCII
+string and convert it to UTF-16 with platform endianness, resulting in
+a new 8-byte salt, which it will then use in the algorithm to produce
+the Key Encryption Key (KEK).  This procedure is incompatible with the
+proprietary WD Security software.
+
+This has 3 consequences:
+
+. This procedure will _happen_ to work correctly with any salt that is
+composed entirely of UTF-16LE encoded ASCII characters, e.g. the default
+salt used by the proprietary WD Security software: "`WDC.`", but it will
+not work correctly with any other salt.
+. The proprietary WD Security software will not be able to unlock any
+drive that has a Security Block created by wdpassport-utils.py.
+. It will behave differently on big-endian platforms, resulting in a
+drive that even it cannot unlock when run on a little-endian platform.
+
+Luckily wdpassport-utils.py populates the password hint field with a
+specific string that can be used to identify a Security Block created by
+it.  By default, *wd-security* will detect this string and enable
+compatibility quirks to allow managing a drive that has a Security Block
+created by wdpassport-utils.py.
+
+Importantly, if wdpassport-utils.py is used to _set_ a password on a
+device that is not currently protected with a password, but that has an
+existing Security Block, then it will still perform the salt mangling
+described above when setting the new password.  The proprietary WD
+Security software will not be able to unlock the device and
+*wd-security* will not be able to detect that the password was set using
+wdpassport-utils.py.  In this case it will be necessary to explicitly
+enable the workaround quirks by passing the *--wdp-utils* switch.
+
+== Bugs
+
+Please report all problems, especially on drives not using the Full Disk
+Encryption cipher, since I did not have access to such drives during
+development.
+
+{homepage}
+
+== See Also
+*iconv*(1), *udevadm*(8), *udev*(7),
+https://github.com/KenMacD/wdpassport-utils/raw/refs/heads/master/WD_Encryption_API.txt[WD_Encryption_API.txt],
+anchor:got-HW-crypto[]https://eprint.iacr.org/2015/1002.pdf[got HW crypto?]

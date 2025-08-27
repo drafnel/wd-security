@@ -2,7 +2,7 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ([2.68])
-AC_INIT([WD-Security], [m4_esyscmd_s(sh ./GEN-VERSION.sh -n)],
+AC_INIT([WD Security], [m4_esyscmd_s(sh ./GEN-VERSION.sh -n)],
 	[drafnel@gmail.com], [], [https://github.com/drafnel/wd-security])
 AC_CONFIG_SRCDIR([wd-security.c])
 AC_CONFIG_HEADERS([config.h])
@@ -16,6 +16,8 @@ AM_INIT_AUTOMAKE([foreign])
 
 # Checks for programs.
 AC_PROG_CC
+AC_PATH_PROG([A2X], [a2x])
+AM_CONDITIONAL([FOUND_A2X], AS_VAR_TEST_SET([ac_cv_path_A2X]))
 
 dnl Prepare for future Autoconf macro to request 64-bit time_t??
 dnl See https://github.com/autotools-mirror/autoconf/blob/master/NEWS

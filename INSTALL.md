@@ -4,6 +4,7 @@
 == REQUIREMENTS
 
 - libssl-dev -- libcrypto.so
+- asciidoc -- a2x utility, for generating the man page
 - A working C compiler and development libraries.
 
 If building directly from the git repository, additionally:

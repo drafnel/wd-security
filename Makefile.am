@@ -12,7 +12,7 @@ doc_DATA = README.md COPYING wd-security-devices.sh wd-security.adoc
 if FOUND_A2X
 man_MANS = wd-security.1
 endif
-wd-security.$(OBJEXT): VERSION.h
+wd-security-cli.$(OBJEXT): VERSION.h
 VERSION.h: FORCE
 	@GIT_DIR='$(top_srcdir)/.git' GIT_WORK_TREE='$(top_srcdir)' $(SHELL) '$(top_srcdir)/GEN-VERSION.sh'
 00-wd-security.rules: $(srcdir)/00-wd-security.rules.in

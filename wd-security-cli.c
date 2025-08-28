@@ -20,6 +20,7 @@
  */
 
 #include "config.h"
+#include "VERSION.h"
 #include "compat.h"
 #include "encoding.h"
 #include "wd-security.h"
@@ -85,6 +86,9 @@
 
 static char *progname;
 static int verbose;
+
+#define software PACKAGE_NAME " v" str(MAJOR) "." str(MINOR) " (" __DATE__ \
+	", " __TIME__ ")"
 
 static void* xmalloc (size_t sz) {
 	void *ptr = malloc(sz);
@@ -2170,7 +2174,7 @@ static int erase_cmd(int argc, char * const argv[]) {
 
 static int version (int argc __attribute__((unused)), char * const argv[] __attribute__((unused)))
 {
-	puts(PACKAGE_STRING);
+	puts(software);
 	return 0;
 }
 

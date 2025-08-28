@@ -78,7 +78,7 @@ Securely erase a device by causing it to install a new Device Encryption
 Key (DEK).
 
 Every device should be erased at least once, to replace the possibly
-insecure factory DEK[^1].
+insecure factory DEK.[^1]
 
 > [!CAUTION]
 > All information on device will become lost and completely

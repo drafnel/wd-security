@@ -3,7 +3,8 @@ wd_security_SOURCES = wd-security-cli.c wd-security.c encoding.c compat.c
 wd_security_SOURCES += compat.h encoding.h wd-security.h
 nodist_wd_security_SOURCES = VERSION.h
 CLEANFILES = VERSION.h 00-wd-security.rules
-EXTRA_DIST = GEN-VERSION.sh 00-wd-security.rules.in wd-security-devices.sh
+EXTRA_DIST = README.md GEN-VERSION.sh 00-wd-security.rules.in \
+             wd-security-devices.sh
 udevrulesdir = $(libdir)/udev/rules.d
 udevrules_DATA = 00-wd-security.rules
 doc_DATA = README.md COPYING wd-security-devices.sh

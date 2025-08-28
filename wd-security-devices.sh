@@ -15,12 +15,13 @@ udevadm info --export-db \
 	while read device; do
 		ID_USB_MODEL=
 		ID_USB_SERIAL_SHORT=
-		eval `udevadm info --query=property \
+		props=`udevadm info --query=property \
 			--property='ID_USB_MODEL,ID_USB_SERIAL_SHORT' \
 			"/dev/$device"` &&
+		eval "$props" &&
 		{
 		  test -n "$header_shown" ||
 		  echo 'Device    Key-File (for udev rule)' && header_shown=1
-		}
+		} &&
 		echo "/dev/$device: /etc/keys/WD_${ID_USB_MODEL}_${ID_USB_SERIAL_SHORT}.key"
 	done

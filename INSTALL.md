@@ -1,7 +1,7 @@
 
-= How to build wd-security from source...
+# How to build wd-security from source...
 
-== REQUIREMENTS
+## REQUIREMENTS
 
 - libssl-dev -- libcrypto.so
 - asciidoc -- a2x utility, for generating the man page
@@ -11,7 +11,7 @@ If building directly from the git repository, additionally:
 
 - autoconf
 
-== CONFIGURE
+## CONFIGURE
 
 Generate the `configure` script (skip if building from a tarball):
 
@@ -26,13 +26,13 @@ the configure in there, for example:
 
     mkdir build && cd build && ../configure
 
-== BUILD
+## BUILD
 
 Then run make to compile the sources:
 
     make -j
 
-== INSTALL
+## INSTALL
 
 Then install (probably as root):
 

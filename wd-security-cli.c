@@ -87,8 +87,7 @@
 static char *progname;
 static int verbose;
 
-#define software PACKAGE_NAME " v" str(MAJOR) "." str(MINOR) " (" __DATE__ \
-	", " __TIME__ ")"
+#define software PACKAGE_NAME " " str(MAJOR) "." str(MINOR)
 
 static void* xmalloc (size_t sz) {
 	void *ptr = malloc(sz);

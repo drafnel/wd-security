@@ -2,8 +2,10 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ([2.68])
-AC_INIT([WD Security], [m4_esyscmd_s(sh ./GEN-VERSION.sh -n)],
-	[drafnel@gmail.com], [], [https://github.com/drafnel/wd-security])
+AC_INIT([WD Security for Linux], [m4_esyscmd_s(sh ./GEN-VERSION.sh -n)],
+	[drafnel@gmail.com], [wd-security],
+	[https://github.com/drafnel/wd-security])
+AC_SUBST([PACKAGE_MAINTAINER], ["Brandon Casey"])
 AC_CONFIG_SRCDIR([wd-security.c])
 AC_CONFIG_HEADERS([config.h])
 

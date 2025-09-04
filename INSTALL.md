@@ -37,3 +37,26 @@ Then run make to compile the sources:
 Then install (probably as root):
 
     sudo make install
+
+## Build a .deb
+
+### Requirements
+
+- dpkg-buildpackage
+
+### Make the deb
+
+    make deb
+
+This should create the following files:
+
+    wd-security_<version>_<arch>.buildinfo
+    wd-security_<version>_<arch>.changes
+    wd-security_<version>_<arch>.deb
+    wd-security_<version>.dsc
+    wd-security_<version>.tar.xz
+    wd-security-dbgsym_<version>_<arch>.ddeb
+
+Use `dpkg` to install the binary package:
+
+    sudo dpkg -i wd-security_<version>_<arch>.deb

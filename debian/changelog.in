@@ -1,0 +1,11 @@
+@PACKAGE_TARNAME@ (@PACKAGE_VERSION@) UNRELEASED; urgency=low
+
+  * Unreleased changes.
+
+ -- A.U. Thor <author@example.com>  Thu, 01 Jan 1970 00:00:00 +0000
+
+wd-security (0.9) unstable; urgency=low
+
+  * Initial release.
+
+ -- Brandon Casey <drafnel@gmail.com>  Thu, 28 Aug 2025 16:56:05 -0500

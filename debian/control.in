@@ -1,0 +1,21 @@
+Source: @PACKAGE_TARNAME@
+Maintainer: @PACKAGE_MAINTAINER@ <@PACKAGE_BUGREPORT@>
+Homepage: @PACKAGE_URL@
+Section: misc
+Priority: optional
+Standards-Version: 4.7.0
+Build-Depends: libssl-dev, debhelper-compat (= 13)
+Vcs-Git: @PACKAGE_URL@.git
+Vcs-Browser: @PACKAGE_URL@
+
+Package: @PACKAGE_TARNAME@
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Suggests: udev
+Description: @PACKAGE_NAME@
+ Manage password protection of Western Digital external drives supported
+ by the proprietary WD Security software.
+ .
+ Supports encrypted drive unlock, set/change password, secure erase, etc.
+ .
+ Additionally, automatic unlocking by udev can be configured.

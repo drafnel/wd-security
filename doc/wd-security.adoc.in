@@ -460,7 +460,7 @@ _/etc/keys/WD_MODEL_SERIAL.key_::
   Key File used by *udev*(7) rules to automatically unlock device
   corresponding to _MODEL_ and _SERIAL_.  See <<_key_file_naming>>.
 
-_@libdir@/udev/rules.d/00-wd-security.rules_::
+_@udevrulesdir@/00-wd-security.rules_::
   *udev*(7) rules implementing automatic device unlock.
 
 _@docdir@/wd-security-devices.sh_::

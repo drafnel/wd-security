@@ -6,7 +6,7 @@ CLEANFILES = VERSION.h 00-wd-security.rules \
              wd-security.adoc wd-security.xml wd-security.1
 EXTRA_DIST = README.md INSTALL.md GEN-VERSION.sh 00-wd-security.rules.in \
              wd-security-devices.sh doc/wd-security.adoc.in
-udevrulesdir = $(libdir)/udev/rules.d
+udevrulesdir = $(prefix)/lib/udev/rules.d
 udevrules_DATA = 00-wd-security.rules
 doc_DATA = README.md COPYING wd-security-devices.sh wd-security.adoc
 if FOUND_ADOC
@@ -22,7 +22,7 @@ wd-security.adoc: $(srcdir)/doc/wd-security.adoc.in
 	    -e 's|@PACKAGE_NAME[@]|$(PACKAGE_NAME)|g' \
 	    -e 's|@PACKAGE_VERSION[@]|$(PACKAGE_VERSION)|g' \
 	    -e 's|@PACKAGE_URL[@]|$(PACKAGE_URL)|g' \
-	    -e 's|@libdir[@]|$(libdir)|g' \
+	    -e 's|@udevrulesdir[@]|$(udevrulesdir)|g' \
 	    -e 's|@docdir[@]|$(docdir)|g' \
 	    $< >$@
 wd-security.1: wd-security.adoc

@@ -93,8 +93,8 @@ device.
 
 ### Manual
 
-See the [manual](doc/wd-security.adoc.in) for more detailed information
-about sub-commands and supported switches.
+See the [manual](https://drafnel.github.io/wd-security/) for more
+detailed information about sub-commands and supported switches.
 
 ## Automatic Unlocking
 
@@ -103,8 +103,8 @@ unlocking on device attach.  A _Key File_ corresponding to each device
 that will be automatically unlocked must be prepared and placed into the
 _/etc/keys_ directory.
 
-See the [manual](doc/wd-security.adoc.in) for information about how to
-create a _Key File_ to enable automatic unlocking.
+See the [manual](https://drafnel.github.io/wd-security/) for information
+about how to create a _Key File_ to enable automatic unlocking.
 
 ## List attached Western Digital drives
 

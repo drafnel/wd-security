@@ -1,0 +1,46 @@
+name: update-manual
+run-name: Update github-pages html manual
+on:
+    push:
+        branches: [ "master" ]
+        paths: [ "doc/wd-security.adoc.in" ]
+    workflow_dispatch:
+permissions:
+    contents: read
+    pages: write
+    id-token: write
+concurrency:
+    group: "pages"
+    cancel-in-progress: false
+jobs:
+    adoc-build:
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v5
+            - run: gem install --user-install asciidoctor
+            - run: autoreconf --verbose --force --install --symlink
+            - name: configure and generate ASCIIDOC manual
+              run: |
+                PATH="$(ruby -r rubygems -e 'puts Gem.user_dir')/bin:$PATH"
+                ./configure --prefix=/usr
+                make wd-security.adoc
+            - name: generate HTML manual
+              id: build
+              run: |
+                PATH="$(ruby -r rubygems -e 'puts Gem.user_dir')/bin:$PATH"
+                asciidoctor wd-security.adoc
+            - run: mkdir _site
+            - run: mv wd-security.html _site/index.html
+            - name: upload generated HTML manual
+              id: deployment
+              uses: actions/upload-pages-artifact@v3
+    adoc-deploy:
+        environment:
+            name: github-pages
+            url: ${{ steps.deployment.outputs.page_url }}
+        runs-on: ubuntu-latest
+        needs: adoc-build
+        steps:
+            - name: Deploy to GitHub Pages
+              id: deployment
+              uses: actions/deploy-pages@v4

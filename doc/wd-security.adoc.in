@@ -324,11 +324,11 @@ $ rm password.utf8
 
 If the proprietary WD Security software will not be used to unlock the
 device, then it is not necessary to impose any restrictions on the
-contents of the _Key File_.  For example, it may be populated with 256
+contents of the _Key File_.  For example, it may be populated with 32
 bytes of random data:
 
 ----
-$ dd if=/dev/urandom of=WD_MODEL_SERIAL.key bs=256 count=1
+$ dd if=/dev/urandom of=WD_MODEL_SERIAL.key bs=32 count=1
 ----
 
 === Test the Key File

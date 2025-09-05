@@ -17,7 +17,13 @@ AS_VAR_SET_IF([CFLAGS], [], [AS_VAR_SET([CFLAGS], ["-W -Wall -O2"])])
 # Checks for programs.
 AC_PROG_CC
 AC_PATH_PROG([A2X], [a2x])
-AM_CONDITIONAL([FOUND_A2X], AS_VAR_TEST_SET([ac_cv_path_A2X]))
+AC_PATH_PROG([ASCIIDOCTOR], [asciidoctor])
+AS_VAR_SET_IF([ac_cv_path_A2X],
+	      [AC_SUBST([ADOC2MAN], ["\$(A2X) --format manpage"])],
+	      [AS_VAR_SET_IF([ac_cv_path_ASCIIDOCTOR],
+			     [AC_SUBST([ADOC2MAN],
+				       ["\$(ASCIIDOCTOR) -b manpage"])])])
+AM_CONDITIONAL([FOUND_ADOC], AS_VAR_TEST_SET([ADOC2MAN]))
 
 dnl Prepare for future Autoconf macro to request 64-bit time_t??
 dnl See https://github.com/autotools-mirror/autoconf/blob/master/NEWS

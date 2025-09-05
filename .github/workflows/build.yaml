@@ -1,0 +1,27 @@
+name: it-compiles
+run-name: Check compilation and source distribution
+on: push
+jobs:
+    make-distcheck:
+        strategy:
+            fail-fast: false
+            matrix:
+                os: [ubuntu-latest, ubuntu-22.04, ubuntu-24.04-arm, ubuntu-22.04-arm]
+        runs-on: ${{ matrix.os }}
+        steps:
+            - uses: actions/checkout@v5
+              with:
+                  fetch-depth: 0
+            - run: git show-ref
+            - run: gem install --user-install asciidoctor
+            - run: autoreconf --verbose --force --install --symlink
+            - name: configure and make distcheck
+              run: |
+                PATH="$(ruby -r rubygems -e 'puts Gem.user_dir')/bin:$PATH"
+                ./configure
+                make distcheck
+            - uses: actions/upload-artifact@v4
+              with:
+                  name: wd-security-${{ github.workflow }}.${{ github.run_number }}.${{ matrix.os }}
+                  path: wd-security-*.tar.gz
+                  compression-level: 0

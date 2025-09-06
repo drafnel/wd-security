@@ -4,6 +4,7 @@ Brandon Casey <@PACKAGE_BUGREPORT@>
 :manmanual: General Commands Manual
 :mansource: @PACKAGE_NAME@
 :manversion: @PACKAGE_VERSION@
+:keywords: WD Security, Western Digital, Linux, password, unlock, encrypt, encryption, AES-256, USB, disk, disc, drive, harddrive, My Book, Passport, My Passport, WD Drive, WD Backup Drive
 :homepage: @PACKAGE_URL@
 
 == Name

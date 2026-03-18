@@ -127,7 +127,7 @@ static void hexdump (FILE *fp, const uint8_t *buf, size_t len) {
 static int reread_part (const char *device) {
 	int err;
 #ifdef HAVE_DECL_BLKRRPART
-	int fd = open(device, O_RDWR);
+	int fd = open(device, O_RDWR | O_EXCL);
 	if (fd == -1) {
 		perror("reread-part failed opening device");
 		return 1;

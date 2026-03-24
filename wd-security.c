@@ -596,14 +596,14 @@ struct wds_handle* wds_open (const char *device, const struct wds_opts *opts,
 	}
 
 	if (ioctl(fd, SG_GET_VERSION_NUM, &ver)) {
-		mesg_errno(ERROR, "ioctl failed getting SG Version Number");
+		mesg_errno(ERROR, "ioctl failed getting SCSI Generic Version Number");
 		if (err)
 			*err = WD_SECURITY_ESYSCALL;
 		close(fd);
 		return NULL;
 	}
 
-	mesg(INFO, "SG Version %d", ver);
+	mesg(INFO, "SCSI Generic Version %d", ver);
 
 	if (ver < 30000) {
 		mesg(ERROR, "not a SCSI Generic device, or driver too old");

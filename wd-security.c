@@ -315,6 +315,7 @@ static const char* const error_names[] = {
 	"Invalid reset SYN",        /* EBADSYN */
 	"Bad cipher or key length", /* ECIPHER */
 	"Locked",                   /* ELOCKED */
+	"Not supported",            /* ENOTSUP */
 };
 
 /* WD Vendor Specific SCSI Commands (VSC) Command Descriptor Block (CDB) */
@@ -603,6 +604,14 @@ struct wds_handle* wds_open (const char *device, const struct wds_opts *opts,
 	}
 
 	mesg(INFO, "SG Version %d", ver);
+
+	if (ver < 30000) {
+		mesg(ERROR, "not a SCSI Generic device, or driver too old");
+		if (err)
+			*err = WD_SECURITY_ENOTSUP;
+		close(fd);
+		return NULL;
+	}
 
 	h = xcalloc(1, sizeof(*h));
 	h->fd = fd;

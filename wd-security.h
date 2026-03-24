@@ -62,6 +62,7 @@ extern "C" {
 #define WD_SECURITY_EBADSYN    11  /* invalid reset syn or wrong param length */
 #define WD_SECURITY_ECIPHER    12  /* cipher/length mismatch (unknown cipher) */
 #define WD_SECURITY_ELOCKED    13  /* attempt to change pw when device locked */
+#define WD_SECURITY_ENOTSUP    14  /* not an SG device or driver too old */
 
 #define WD_SECURITY_ESCSI      32  /* info != SG_INFO_OK,  */
 #define WD_SECURITY_ESENSE     33  /* SCSI status is CHECK_CONDITION */

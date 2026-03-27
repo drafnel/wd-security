@@ -991,13 +991,13 @@ static int get_iterations_salt (
 	return 0;
 }
 
-static void status_cmd_usage (FILE *fp, const char *name) {
+static void subcmd_usage (FILE *fp, const char *name) {
 	fprintf(fp, "usage: %s %s [--help] [OPTIONS] <device>\n",
 			progname, name);
 }
 
 static void status_cmd_help (const char *name) {
-	status_cmd_usage(stdout, name);
+	subcmd_usage(stdout, name);
 	printf("\n"
 	       "Show encryption status of <device>\n"
 	       "\n"
@@ -1037,13 +1037,13 @@ static int status_cmd (int argc, char * const argv[]) {
 			is_locked = 1;
 			break;
 		case '?':
-			status_cmd_usage(stderr, argv[0]);
+			subcmd_usage(stderr, argv[0]);
 			return 1;
 		}
 	}
 
 	if (argc - optind != 1) {
-		status_cmd_usage(stderr, argv[0]);
+		subcmd_usage(stderr, argv[0]);
 		return 1;
 	}
 
@@ -1195,13 +1195,8 @@ static int show_handy_store_user_block (FILE *fp, struct wds_handle *wds) {
 	return 0;
 }
 
-static void handy_store_cmd_usage (FILE *fp, const char *name) {
-	fprintf(fp, "usage: %s %s [--help] [OPTIONS] <device>\n",
-			progname, name);
-}
-
 static void handy_store_cmd_help (const char *name) {
-	handy_store_cmd_usage(stdout, name);
+	subcmd_usage(stdout, name);
 	printf("\n"
 	       "Show or manipulate the Handy Store of <device>\n"
 	       "\n"
@@ -1275,13 +1270,13 @@ static int handy_store_cmd (int argc, char * const argv[]) {
 			detect_wdputils = FORCE_WDP_UTILS;
 			break;
 		case '?':
-			handy_store_cmd_usage(stderr, argv[0]);
+			subcmd_usage(stderr, argv[0]);
 			return 1;
 		}
 	}
 
 	if (argc - optind != 1) {
-		handy_store_cmd_usage(stderr, argv[0]);
+		subcmd_usage(stderr, argv[0]);
 		return 1;
 	}
 
@@ -1372,13 +1367,8 @@ static int unlock (wds_handle *wds, const uint8_t *salt, size_t salt_bytes,
 	return 0;
 }
 
-static void unlock_cmd_usage (FILE *fp, const char *name) {
-	fprintf(fp, "usage: %s %s [--help] [OPTIONS] <device>\n",
-			progname, name);
-}
-
 static void unlock_cmd_help (const char *name) {
-	unlock_cmd_usage(stdout, name);
+	subcmd_usage(stdout, name);
 	printf("\n"
 	       "Prompt for password and unlock <device>.  The password will be\n"
 	       "converted to UTF-16LE encoding to be compatible with the\n"
@@ -1480,13 +1470,13 @@ static int unlock_cmd (int argc, char * const argv[]) {
 			detect_wdputils = FORCE_WDP_UTILS;
 			break;
 		case '?':
-			unlock_cmd_usage(stderr, argv[0]);
+			subcmd_usage(stderr, argv[0]);
 			return 1;
 		}
 	}
 
 	if (argc - optind != 1) {
-		unlock_cmd_usage(stderr, argv[0]);
+		subcmd_usage(stderr, argv[0]);
 		return 1;
 	}
 
@@ -1605,13 +1595,8 @@ static int changepw (wds_handle *wds, const uint8_t *salt, size_t salt_bytes,
 	return 0;
 }
 
-static void changepw_cmd_usage (FILE *fp, const char *name) {
-	fprintf(fp, "usage: %s %s [--help] [OPTIONS] <devpath>\n",
-			progname, name);
-}
-
 static void changepw_cmd_help (const char *name) {
-	changepw_cmd_usage(stdout, name);
+	subcmd_usage(stdout, name);
 	printf("\n"
 	       "Prompt for password(s) and enable/disable/change encryption\n"
 	       "status of <device>.  The password(s) will be converted to\n"
@@ -1755,13 +1740,13 @@ static int changepw_cmd (int argc, char * const argv[]) {
 			detect_wdputils = FORCE_WDP_UTILS;
 			break;
 		case '?':
-			changepw_cmd_usage(stderr, argv[0]);
+			subcmd_usage(stderr, argv[0]);
 			return 1;
 		}
 	}
 
 	if (argc - optind != 1) {
-		changepw_cmd_usage(stderr, argv[0]);
+		subcmd_usage(stderr, argv[0]);
 		return 1;
 	}
 
@@ -1992,13 +1977,8 @@ static int erase_drive (wds_handle *wds, uint8_t reset_syn[4],
 	return err;
 }
 
-static void erase_cmd_usage (FILE *fp, const char *name) {
-	fprintf(fp, "usage: %s %s [--help] [OPTIONS] <device>\n",
-			progname, name);
-}
-
 static void erase_cmd_help (const char *name) {
-	erase_cmd_usage(stdout, name);
+	subcmd_usage(stdout, name);
 	printf("\n"
 	       "Erase <device> by changing Device Encryption Key (DEK)\n"
 	       "\n"
@@ -2060,7 +2040,7 @@ static int erase_cmd(int argc, char * const argv[]) {
 		case 'I':
 			ul_tmp = strtoul(optarg, NULL, 0);
 			if (ul_tmp > UINT8_MAX) {
-				erase_cmd_usage(stderr, argv[0]);
+				subcmd_usage(stderr, argv[0]);
 				fputs("Error: cipher-id out-of-range\n", stderr);
 				return 1;
 			}
@@ -2075,7 +2055,7 @@ static int erase_cmd(int argc, char * const argv[]) {
 		case 'l':
 			ul_tmp = strtoul(optarg, NULL, 0);
 			if (ul_tmp > UINT16_MAX) {
-				erase_cmd_usage(stderr, argv[0]);
+				subcmd_usage(stderr, argv[0]);
 				fputs("Error: key-size out-of-range\n", stderr);
 				return 1;
 			}
@@ -2086,13 +2066,13 @@ static int erase_cmd(int argc, char * const argv[]) {
 			clear_sec_block = 0;
 			break;
 		case '?':
-			erase_cmd_usage(stderr, argv[0]);
+			subcmd_usage(stderr, argv[0]);
 			return 1;
 		}
 	}
 
 	if (argc - optind != 1) {
-		erase_cmd_usage(stderr, argv[0]);
+		subcmd_usage(stderr, argv[0]);
 		return 1;
 	}
 

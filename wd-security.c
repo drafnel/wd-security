@@ -32,6 +32,7 @@
 #include <errno.h>
 #include <endian.h>
 #include <inttypes.h>
+#include <limits.h>
 
 #include <fcntl.h>
 #include <unistd.h>
@@ -571,6 +572,67 @@ static int decode_sense_data_generic (const struct sense_data_packed *sdp)
 	return MAKE_SENSE_ERROR(sdp);
 }
 
+static int scsi_cmd (int fd, unsigned int timeout, unsigned char *cmdp,
+		unsigned char cmd_len, int dxfer_direction, void *dxferp,
+		unsigned int *dxfer_len,
+		int (*decode_sense) (const struct sense_data_packed*))
+{
+	sg_io_hdr_t sg_hdr;
+	unsigned char sensb[sizeof(struct sense_data_packed)];
+
+	hexdump(DEBUG2, "SCSI CDB:", (uint8_t*)cmdp, cmd_len);
+
+	memset(sensb, 0, sizeof(sensb));
+
+	memset(&sg_hdr, 0, sizeof(sg_hdr));
+	sg_hdr.interface_id = 'S';
+	sg_hdr.dxfer_direction = dxfer_direction;
+	sg_hdr.cmd_len = cmd_len;
+	sg_hdr.mx_sb_len = sizeof(sensb);
+	sg_hdr.dxfer_len = *dxfer_len;
+	sg_hdr.dxferp = dxferp;
+	sg_hdr.cmdp = cmdp;
+	sg_hdr.sbp = sensb;
+	sg_hdr.timeout = timeout;
+
+	if (ioctl(fd, SG_IO, &sg_hdr)) {
+		mesg_errno(ERROR, "SCSI ioctl failed");
+		return WD_SECURITY_ESYSCALL;
+	}
+
+	if ((sg_hdr.info & SG_INFO_OK_MASK) != SG_INFO_OK) {
+		mesg(ERROR, "SCSI command failed");
+		if (sg_hdr.masked_status == CHECK_CONDITION) {
+			hexdump(DEBUG2, "Sense Buffer:", sensb, sg_hdr.sb_len_wr);
+			if (!decode_sense)
+				decode_sense = decode_sense_data_generic;
+			return decode_sense((struct sense_data_packed*)sensb);
+		}
+		mesg(DEBUG, "SCSI error ("
+			    "status: 0x%.2hhx, "
+			    "masked_status: 0x%.2hhx, "
+			    "msg_status: 0x%.2hhx, "
+			    "host_status: 0x%.4hx, "
+			    "driver_status: 0x%.4hx)",
+			    sg_hdr.status,
+			    sg_hdr.masked_status,
+			    sg_hdr.msg_status,
+			    sg_hdr.host_status,
+			    sg_hdr.driver_status);
+		return MAKE_SG_ERROR(sg_hdr);
+	}
+
+	*dxfer_len -= sg_hdr.resid;
+
+	if (dxfer_direction == SG_DXFER_FROM_DEV ||
+	    dxfer_direction == SG_DXFER_TO_FROM_DEV)
+	{
+		hexdump(DEBUG2, "SCSI Command Response:", dxferp, *dxfer_len);
+	}
+
+	return 0;
+}
+
 struct wds_handle* wds_open (const char *device, const struct wds_opts *opts,
 		int *err)
 {
@@ -640,66 +702,22 @@ struct wds_encryption_status* wds_get_status (struct wds_handle *wds, int *err)
 {
 	const struct wds_encryption_status_packed *esp;
 	struct wds_encryption_status *es;
-	sg_io_hdr_t sg_hdr;
 	struct wds_vsc_cdb cdb = WD_SECURITY_VSC_CDB_STATUS_INIT;
 	unsigned char buf[sizeof(struct wds_encryption_status_packed) +
 		WD_SECURITY_MAX_CIPHERS];
-	unsigned char sensb[sizeof(struct sense_data_packed)];
+	unsigned int dxfer_len;
+	int e;
 
 	cdb.length = htobe16(sizeof(buf));
 
-	hexdump(DEBUG2, "Encryption Status CDB:", (uint8_t*)&cdb, sizeof(cdb));
-
-	memset(sensb, 0, sizeof(sensb));
-
-	memset(&sg_hdr, 0, sizeof(sg_hdr));
-	sg_hdr.interface_id = 'S';
-	sg_hdr.dxfer_direction = SG_DXFER_FROM_DEV;
-	sg_hdr.cmd_len = sizeof(cdb);
-	sg_hdr.mx_sb_len = sizeof(sensb);
-	sg_hdr.dxfer_len = sizeof(buf);
-	sg_hdr.dxferp = &buf;
-	sg_hdr.cmdp = (unsigned char*) &cdb;
-	sg_hdr.sbp = sensb;
-	sg_hdr.timeout = wds->timeout;
-
-	if (ioctl(wds->fd, SG_IO, &sg_hdr)) {
-		mesg_errno(ERROR, "ioctl failed reading encryption status");
+	dxfer_len = sizeof(buf);
+	e = scsi_cmd(wds->fd, wds->timeout, (unsigned char*)&cdb, sizeof(cdb),
+			SG_DXFER_FROM_DEV, buf, &dxfer_len, NULL);
+	if (e) {
 		if (err)
-			*err = WD_SECURITY_ESYSCALL;
+			*err = e;
 		return NULL;
 	}
-
-	if ((sg_hdr.info & SG_INFO_OK_MASK) != SG_INFO_OK) {
-		mesg(ERROR, "SCSI command failed reading encryption status");
-		if (sg_hdr.masked_status == CHECK_CONDITION) {
-			int e;
-			hexdump(DEBUG2, "Sense Buffer:", sensb,
-					sg_hdr.sb_len_wr);
-			e = decode_sense_data_generic(
-					(struct sense_data_packed*)sensb);
-			if (err)
-				*err = e;
-			return NULL;
-		}
-		mesg(DEBUG, "SCSI error ("
-			    "status: 0x%.2hhx, "
-			    "masked_status: 0x%.2hhx, "
-			    "msg_status: 0x%.2hhx, "
-			    "host_status: 0x%.4hx, "
-			    "driver_status: 0x%.4hx)",
-			    sg_hdr.status,
-			    sg_hdr.masked_status,
-			    sg_hdr.msg_status,
-			    sg_hdr.host_status,
-			    sg_hdr.driver_status);
-		if (err)
-			*err = MAKE_SG_ERROR(sg_hdr);
-		return NULL;
-	}
-
-	hexdump(DEBUG2, "Encryption Status:",
-			buf, sizeof(struct wds_encryption_status_packed));
 
 	esp = (const struct wds_encryption_status_packed*) &buf;
 
@@ -725,55 +743,17 @@ struct wds_encryption_status* wds_get_status (struct wds_handle *wds, int *err)
 int wds_read_handy_capacity (struct wds_handle *wds,
 		struct wds_handy_capacity *hc)
 {
-	sg_io_hdr_t sg_hdr;
 	struct wds_handy_capacity_packed hcp;
 	struct wds_vsc_cdb cdb = WD_SECURITY_VSC_CDB_HANDY_CAPACITY_INIT;
-	unsigned char sensb[sizeof(struct sense_data_packed)];
+	unsigned int dxfer_len;
+	int err;
 
-	hexdump(DEBUG2, "Handy Capacity CDB:", (uint8_t*)&cdb, sizeof(cdb));
+	dxfer_len = sizeof(hcp);
 
-	memset(sensb, 0, sizeof(sensb));
-
-	memset(&sg_hdr, 0, sizeof(sg_hdr));
-	sg_hdr.interface_id = 'S';
-	sg_hdr.dxfer_direction = SG_DXFER_FROM_DEV;
-	sg_hdr.cmd_len = sizeof(cdb);
-	sg_hdr.mx_sb_len = sizeof(sensb);
-	sg_hdr.dxfer_len = sizeof(hcp);
-	sg_hdr.dxferp = &hcp;
-	sg_hdr.cmdp = (unsigned char*) &cdb;
-	sg_hdr.sbp = sensb;
-	sg_hdr.timeout = wds->timeout;
-
-	if (ioctl(wds->fd, SG_IO, &sg_hdr)) {
-		mesg_errno(ERROR, "ioctl failed reading Handy Capacity");
-		return WD_SECURITY_ESYSCALL;
-	}
-
-	if ((sg_hdr.info & SG_INFO_OK_MASK) != SG_INFO_OK) {
-		mesg(ERROR, "SCSI command failed reading Handy Capacity");
-		if (sg_hdr.masked_status == CHECK_CONDITION) {
-			hexdump(DEBUG2, "Sense Buffer:", sensb,
-					sg_hdr.sb_len_wr);
-			return decode_sense_data_generic(
-					(struct sense_data_packed*)sensb);
-		}
-		mesg(DEBUG, "SCSI error ("
-			    "status: 0x%.2hhx, "
-			    "masked_status: 0x%.2hhx, "
-			    "msg_status: 0x%.2hhx, "
-			    "host_status: 0x%.4hx, "
-			    "driver_status: 0x%.4hx)",
-			    sg_hdr.status,
-			    sg_hdr.masked_status,
-			    sg_hdr.msg_status,
-			    sg_hdr.host_status,
-			    sg_hdr.driver_status);
-		return MAKE_SG_ERROR(sg_hdr);
-	}
-
-	hexdump(DEBUG2, "Handy Capacity Response:", (uint8_t*) &hcp,
-			sizeof(hcp));
+	err = scsi_cmd(wds->fd, wds->timeout, (unsigned char*)&cdb, sizeof(cdb),
+			SG_DXFER_FROM_DEV, &hcp, &dxfer_len, NULL);
+	if (err)
+		return err;
 
 	unpack_handy_capacity(&hcp, hc);
 
@@ -811,63 +791,27 @@ static int decode_sense_data_handy_store (const struct sense_data_packed *sdp)
 static int wds_write_handy_store_blocks (struct wds_handle *wds, uint32_t block,
 		uint16_t num_blocks, const void *buf, size_t *buf_len)
 {
-	sg_io_hdr_t sg_hdr;
 	struct wds_vsc_cdb cdb = WD_SECURITY_VSC_CDB_HANDY_STORE_WR_INIT;
-	unsigned char sensb[sizeof(struct sense_data_packed)];
+	unsigned int dxfer_len;
+	int err;
 
 	cdb.address = htobe32(block);
 	cdb.length = htobe16(num_blocks);
 
-	hexdump(DEBUG2, "Handy Store CDB:", (uint8_t*)&cdb, sizeof(cdb));
-
-	memset(sensb, 0, sizeof(sensb));
-
-	memset(&sg_hdr, 0, sizeof(sg_hdr));
-	sg_hdr.interface_id = 'S';
-	sg_hdr.dxfer_direction = SG_DXFER_TO_DEV;
-	sg_hdr.cmd_len = sizeof(cdb);
-	sg_hdr.mx_sb_len = sizeof(sensb);
-	sg_hdr.dxfer_len = *buf_len;
-	sg_hdr.dxferp = (void*)buf;
-	sg_hdr.cmdp = (unsigned char*) &cdb;
-	sg_hdr.sbp = sensb;
-	sg_hdr.timeout = wds->timeout;
-
-	if (ioctl(wds->fd, SG_IO, &sg_hdr)) {
-		mesg_errno(ERROR, "ioctl failed writing Handy Store "
-				"Block %" PRIu32 " count %" PRIu16,
-				block, num_blocks);
-		return WD_SECURITY_ESYSCALL;
+	if (*buf_len > UINT_MAX) {
+		mesg(WARNING, "Handy Store blocks buffer too big, truncating");
+		*buf_len = UINT_MAX;
 	}
 
-	if ((sg_hdr.info & SG_INFO_OK_MASK) != SG_INFO_OK) {
-		mesg(ERROR, "SCSI command failed writing Handy Store "
-				"Block %" PRIu32 " count %" PRIu16,
-				block, num_blocks);
-		if (sg_hdr.masked_status == CHECK_CONDITION) {
-			hexdump(DEBUG2, "Sense Buffer:", sensb,
-					sg_hdr.sb_len_wr);
-			return decode_sense_data_handy_store(
-					(struct sense_data_packed*)sensb);
-		}
-		mesg(DEBUG, "SCSI error ("
-			    "status: 0x%.2hhx, "
-			    "masked_status: 0x%.2hhx, "
-			    "msg_status: 0x%.2hhx, "
-			    "host_status: 0x%.4hx, "
-			    "driver_status: 0x%.4hx)",
-			    sg_hdr.status,
-			    sg_hdr.masked_status,
-			    sg_hdr.msg_status,
-			    sg_hdr.host_status,
-			    sg_hdr.driver_status);
-		return MAKE_SG_ERROR(sg_hdr);
-	}
+	dxfer_len = *buf_len;
+	err = scsi_cmd(wds->fd, wds->timeout, (unsigned char*)&cdb, sizeof(cdb),
+			SG_DXFER_TO_DEV, (unsigned char*)buf, &dxfer_len,
+			decode_sense_data_handy_store);
 
 	/* Update buf_len to contain number of bytes actually transferred? */
-	*buf_len -= sg_hdr.resid;
+	*buf_len = dxfer_len;
 
-	return 0;
+	return err;
 }
 
 int wds_write_handy_store_security_block (struct wds_handle *wds,
@@ -921,64 +865,27 @@ int wds_write_handy_store_user_block (struct wds_handle *wds,
 static int wds_read_handy_store_blocks (struct wds_handle *wds, uint32_t block,
 		uint16_t num_blocks, void *buf, size_t *buf_len)
 {
-	sg_io_hdr_t sg_hdr;
 	struct wds_vsc_cdb cdb = WD_SECURITY_VSC_CDB_HANDY_STORE_RD_INIT;
-	unsigned char sensb[sizeof(struct sense_data_packed)];
+	unsigned int dxfer_len;
+	int err;
 
 	cdb.address = htobe32(block);
 	cdb.length = htobe16(num_blocks);
 
-	hexdump(DEBUG2, "Handy Store CDB:", (uint8_t*)&cdb, sizeof(cdb));
-
-	memset(sensb, 0, sizeof(sensb));
-
-	memset(&sg_hdr, 0, sizeof(sg_hdr));
-	sg_hdr.interface_id = 'S';
-	sg_hdr.dxfer_direction = SG_DXFER_FROM_DEV;
-	sg_hdr.cmd_len = sizeof(cdb);
-	sg_hdr.mx_sb_len = sizeof(sensb);
-	sg_hdr.dxfer_len = *buf_len;
-	sg_hdr.dxferp = buf;
-	sg_hdr.cmdp = (unsigned char*) &cdb;
-	sg_hdr.sbp = sensb;
-	sg_hdr.timeout = wds->timeout;
-
-	if (ioctl(wds->fd, SG_IO, &sg_hdr)) {
-		mesg_errno(ERROR, "ioctl failed reading Handy Store "
-				"Block %" PRIu32 " count %" PRIu16,
-				block, num_blocks);
-		return WD_SECURITY_ESYSCALL;
+	if (*buf_len > UINT_MAX) {
+		mesg(WARNING, "Handy Store blocks buffer too big, clamping");
+		*buf_len = UINT_MAX;
 	}
 
-	if ((sg_hdr.info & SG_INFO_OK_MASK) != SG_INFO_OK) {
-		mesg(ERROR, "SCSI command failed reading Handy Store "
-				"Block %" PRIu32 " count %" PRIu16,
-				block, num_blocks);
-		if (sg_hdr.masked_status == CHECK_CONDITION) {
-			hexdump(DEBUG2, "Sense Buffer:", sensb,
-					sg_hdr.sb_len_wr);
-			return decode_sense_data_generic(
-					(struct sense_data_packed*)sensb);
-		}
-		mesg(DEBUG, "SCSI error ("
-			    "status: 0x%.2hhx, "
-			    "masked_status: 0x%.2hhx, "
-			    "msg_status: 0x%.2hhx, "
-			    "host_status: 0x%.4hx, "
-			    "driver_status: 0x%.4hx)",
-			    sg_hdr.status,
-			    sg_hdr.masked_status,
-			    sg_hdr.msg_status,
-			    sg_hdr.host_status,
-			    sg_hdr.driver_status);
-		return MAKE_SG_ERROR(sg_hdr);
-	}
+	dxfer_len = *buf_len;
+	err = scsi_cmd(wds->fd, wds->timeout, (unsigned char*)&cdb, sizeof(cdb),
+			SG_DXFER_FROM_DEV, (unsigned char*)buf, &dxfer_len, NULL);
+	if (err)
+		return err;
 
-	*buf_len -= sg_hdr.resid;
+	*buf_len = dxfer_len;
 
 	mesg(DEBUG2, "Handy Store Buffer Length: %zu", *buf_len);
-
-	hexdump(DEBUG2, "Handy Store Block:", (uint8_t*)buf, *buf_len);
 
 	return 0;
 }
@@ -1204,11 +1111,11 @@ static int decode_sense_data_unlock (const struct sense_data_packed *sdp)
 int wds_unlock_kek (struct wds_handle *wds, const uint8_t *kek,
 		uint16_t kek_bytes)
 {
-	sg_io_hdr_t sg_hdr;
 	struct wds_vsc_cdb cdb = WD_SECURITY_VSC_CDB_UNLOCK_INIT;
 	struct wds_encryption_unlock_packed *unlock_param;
 	uint16_t unlock_param_len;
-	unsigned char sensb[sizeof(struct sense_data_packed)];
+	unsigned int dxfer_len;
+	int err;
 
 	unlock_param_len = offsetof(struct wds_encryption_unlock_packed, kek) +
 		kek_bytes;
@@ -1219,50 +1126,15 @@ int wds_unlock_kek (struct wds_handle *wds, const uint8_t *kek,
 
 	cdb.length = htobe16(unlock_param_len);
 
-	hexdump(DEBUG2, "Unlock CDB:", (uint8_t*)&cdb, sizeof(cdb));
-
-	memset(sensb, 0, sizeof(sensb));
-
-	memset(&sg_hdr, 0, sizeof(sg_hdr));
-	sg_hdr.interface_id = 'S';
-	sg_hdr.dxfer_direction = SG_DXFER_TO_DEV;
-	sg_hdr.cmd_len = sizeof(cdb);
-	sg_hdr.mx_sb_len = sizeof(sensb);
-	sg_hdr.dxfer_len = unlock_param_len;
-	sg_hdr.dxferp = unlock_param;
-	sg_hdr.cmdp = (unsigned char*) &cdb;
-	sg_hdr.sbp = sensb;
-	sg_hdr.timeout = wds->timeout;
-
-	if (ioctl(wds->fd, SG_IO, &sg_hdr)) {
-		mesg_errno(ERROR, "ioctl failed unlocking device");
-		free(unlock_param);
-		return WD_SECURITY_ESYSCALL;
-	}
+	dxfer_len = unlock_param_len;
+	err = scsi_cmd(wds->fd, wds->timeout, (unsigned char*)&cdb, sizeof(cdb),
+			SG_DXFER_TO_DEV, (unsigned char*)unlock_param,
+			&dxfer_len, decode_sense_data_unlock);
 
 	free(unlock_param);
 
-	if ((sg_hdr.info & SG_INFO_OK_MASK) != SG_INFO_OK) {
-		mesg(ERROR, "SCSI command failed unlocking device");
-		if (sg_hdr.masked_status == CHECK_CONDITION) {
-			hexdump(DEBUG2, "Sense Buffer:", sensb,
-					sg_hdr.sb_len_wr);
-			return decode_sense_data_unlock(
-					(struct sense_data_packed*)&sensb);
-		}
-		mesg(DEBUG, "SCSI error ("
-			    "status: 0x%.2hhx, "
-			    "masked_status: 0x%.2hhx, "
-			    "msg_status: 0x%.2hhx, "
-			    "host_status: 0x%.4hx, "
-			    "driver_status: 0x%.4hx",
-			    sg_hdr.status,
-			    sg_hdr.masked_status,
-			    sg_hdr.msg_status,
-			    sg_hdr.host_status,
-			    sg_hdr.driver_status);
-		return MAKE_SG_ERROR(sg_hdr);
-	}
+	if (err)
+		return err;
 
 	/* clear status bit */
 	wds->status_loaded = 0;
@@ -1355,9 +1227,9 @@ int wds_changepw_kek (struct wds_handle *wds, const uint8_t *oldkek,
 {
 	struct wds_encryption_setpw_packed *param;
 	struct wds_vsc_cdb cdb = WD_SECURITY_VSC_CDB_SETPW_INIT;
-	sg_io_hdr_t sg_hdr;
 	uint16_t param_len;
-	unsigned char sensb[sizeof(struct sense_data_packed)];
+	unsigned int dxfer_len;
+	int err;
 
 	param_len = offsetof(struct wds_encryption_setpw_packed, kek) +
 		2 * kek_bytes;
@@ -1377,50 +1249,15 @@ int wds_changepw_kek (struct wds_handle *wds, const uint8_t *oldkek,
 
 	cdb.length = htobe16(param_len);
 
-	hexdump(DEBUG2, "ChangePW CDB:", (uint8_t*)&cdb, sizeof(cdb));
-
-	memset(sensb, 0, sizeof(sensb));
-
-	memset(&sg_hdr, 0, sizeof(sg_hdr));
-	sg_hdr.interface_id = 'S';
-	sg_hdr.dxfer_direction = SG_DXFER_TO_DEV;
-	sg_hdr.cmd_len = sizeof(cdb);
-	sg_hdr.mx_sb_len = sizeof(sensb);
-	sg_hdr.dxfer_len = param_len;
-	sg_hdr.dxferp = param;
-	sg_hdr.cmdp = (unsigned char*) &cdb;
-	sg_hdr.sbp = sensb;
-	sg_hdr.timeout = wds->timeout;
-
-	if (ioctl(wds->fd, SG_IO, &sg_hdr)) {
-		mesg_errno(ERROR, "ioctl failed changing password");
-		free(param);
-		return WD_SECURITY_ESYSCALL;
-	}
+	dxfer_len = param_len;
+	err = scsi_cmd(wds->fd, wds->timeout, (unsigned char*)&cdb, sizeof(cdb),
+		SG_DXFER_TO_DEV, (unsigned char*)param, &dxfer_len,
+		decode_sense_data_changepw);
 
 	free(param);
 
-	if ((sg_hdr.info & SG_INFO_OK_MASK) != SG_INFO_OK) {
-		mesg(ERROR, "SCSI command failed changing password");
-		if (sg_hdr.masked_status == CHECK_CONDITION) {
-			hexdump(DEBUG2, "Sense Buffer:", sensb,
-					sg_hdr.sb_len_wr);
-			return decode_sense_data_changepw(
-					(struct sense_data_packed*)&sensb);
-		}
-		mesg(DEBUG, "SCSI error ("
-			    "status: 0x%.2hhx, "
-			    "masked_status: 0x%.2hhx, "
-			    "msg_status: 0x%.2hhx, "
-			    "host_status: 0x%.4hx, "
-			    "driver_status: 0x%.4hx",
-			    sg_hdr.status,
-			    sg_hdr.masked_status,
-			    sg_hdr.msg_status,
-			    sg_hdr.host_status,
-			    sg_hdr.driver_status);
-		return MAKE_SG_ERROR(sg_hdr);
-	}
+	if (err)
+		return err;
 
 	/* clear status bit */
 	wds->status_loaded = 0;
@@ -1527,9 +1364,9 @@ int wds_erase (struct wds_handle *wds, const uint8_t reset_syn[4],
 {
 	struct wds_encryption_erase_packed *param;
 	struct wds_vsc_cdb cdb = WD_SECURITY_VSC_CDB_ERASE_INIT;
-	sg_io_hdr_t sg_hdr;
 	uint16_t param_len;
-	unsigned char sensb[sizeof(struct sense_data_packed)];
+	unsigned int dxfer_len;
+	int err;
 
 	param_len = offsetof(struct wds_encryption_erase_packed, key) +
 		key_bytes;
@@ -1545,50 +1382,15 @@ int wds_erase (struct wds_handle *wds, const uint8_t reset_syn[4],
 	memcpy(&cdb.address, reset_syn, sizeof(cdb.address));
 	cdb.length = htobe16(param_len);
 
-	hexdump(DEBUG2, "Erase CDB:", (uint8_t*)&cdb, sizeof(cdb));
-
-	memset(sensb, 0, sizeof(sensb));
-
-	memset(&sg_hdr, 0, sizeof(sg_hdr));
-	sg_hdr.interface_id = 'S';
-	sg_hdr.dxfer_direction = SG_DXFER_TO_DEV;
-	sg_hdr.cmd_len = sizeof(cdb);
-	sg_hdr.mx_sb_len = sizeof(sensb);
-	sg_hdr.dxfer_len = param_len;
-	sg_hdr.dxferp = param;
-	sg_hdr.cmdp = (unsigned char*) &cdb;
-	sg_hdr.sbp = sensb;
-	sg_hdr.timeout = wds->timeout;
-
-	if (ioctl(wds->fd, SG_IO, &sg_hdr)) {
-		mesg_errno(ERROR, "ioctl failed erasing device");
-		free(param);
-		return WD_SECURITY_ESYSCALL;
-	}
+	dxfer_len = param_len;
+	err = scsi_cmd(wds->fd, wds->timeout, (unsigned char*)&cdb, sizeof(cdb),
+		SG_DXFER_TO_DEV, (unsigned char*)param, &dxfer_len,
+		decode_sense_data_erase);
 
 	free(param);
 
-	if ((sg_hdr.info & SG_INFO_OK_MASK) != SG_INFO_OK) {
-		mesg(ERROR, "SCSI command failed erasing device");
-		if (sg_hdr.masked_status == CHECK_CONDITION) {
-			hexdump(DEBUG2, "Sense Buffer:", sensb,
-					sg_hdr.sb_len_wr);
-			return decode_sense_data_erase(
-					(struct sense_data_packed*)sensb);
-		}
-		mesg(DEBUG, "SCSI error ("
-			    "status: 0x%.2hhx, "
-			    "masked_status: 0x%.2hhx, "
-			    "msg_status: 0x%.2hhx, "
-			    "host_status: 0x%.4hx, "
-			    "driver_status: 0x%.4hx)",
-			    sg_hdr.status,
-			    sg_hdr.masked_status,
-			    sg_hdr.msg_status,
-			    sg_hdr.host_status,
-			    sg_hdr.driver_status);
-		return MAKE_SG_ERROR(sg_hdr);
-	}
+	if (err)
+		return err;
 
 	/* clear status bit */
 	wds->status_loaded = 0;

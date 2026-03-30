@@ -1795,6 +1795,9 @@ static int unlock_cmd (int argc, char * const argv[]) {
 		return 1;
 	}
 
+	if (verbose)
+		fprintf(stderr, "Reading Handy Store Security Block...\n");
+
 	read_security_block_nofail(wds, &sb, detect_wdputils);
 
 	pw = get_password(&pw_bytes, key_file, pw_arg,
@@ -1810,6 +1813,25 @@ static int unlock_cmd (int argc, char * const argv[]) {
 	{
 		free(pw);
 		return 1;
+	}
+
+	if (verbose) {
+		char *salt_utf8;
+		size_t salt_len;
+
+		fprintf(stderr, "Using the following parameters:\n"
+				"   Password Salt: ");
+
+		salt_utf8 = utf16le_to_utf8(salt, salt_bytes, &salt_len);
+		if (salt_utf8) {
+			fprintf(stderr, "\"%s\" ", salt_utf8);
+			free(salt_utf8);
+		}
+		hexdump(stderr, salt, salt_bytes);
+
+		fprintf(stderr, "\n"
+				"  Iteration Rnds: %lu\n"
+				"Trying to unlock...\n", iterations);
 	}
 
 	err = unlock(wds, salt, salt_bytes, pw, pw_bytes, iterations);
@@ -1830,6 +1852,10 @@ static int unlock_cmd (int argc, char * const argv[]) {
 			if (is_wdpassport_utils(sb.hint))
 				memset(sb.hint, 0, sizeof(sb.hint));
 
+			if (verbose)
+				fprintf(stderr, "Writing new Handy Store "
+						"Security Block...\n");
+
 			err = wds_write_handy_store_security_block(wds, &sb);
 			if (err) {
 				fprintf(stderr, "Error: failed writing new "
@@ -1845,8 +1871,12 @@ static int unlock_cmd (int argc, char * const argv[]) {
 
 	if (!err) {
 		printf("Successfully unlocked drive\n");
-		if (do_rescan)
+		if (do_rescan) {
+			if (verbose)
+				fprintf(stderr, "Trying to reread partition "
+						"table...\n");
 			err = reread_part(devpath);
+		}
 	}
 
 	return !!err;
@@ -2074,6 +2104,9 @@ static int changepw_cmd (int argc, char * const argv[]) {
 		return 1;
 	}
 
+	if (verbose)
+		fprintf(stderr, "Reading Handy Store Security Block...\n");
+
 	read_security_block_nofail(wds, &sb, detect_wdputils);
 
 	if (es->status == WD_SECURITY_STATUS_UNLOCKED) {
@@ -2152,6 +2185,11 @@ static int changepw_cmd (int argc, char * const argv[]) {
 		 *
 		 *   Generate new security block.
 		 */
+
+		if (verbose)
+			fprintf(stderr, "Generating new Handy Store Security "
+					"Block...\n");
+
 		if (gen_security_block(&sb, salt_file, salt_arg, iterations,
 				hint_arg, iter_time))
 		{
@@ -2163,6 +2201,10 @@ static int changepw_cmd (int argc, char * const argv[]) {
 			wds_close(wds);
 			return 1;
 		}
+
+		if (verbose)
+			fprintf(stderr, "Writing new Handy Store Security "
+					"Block...\n");
 
 		err = wds_write_handy_store_security_block(wds, &sb);
 		if (err) {
@@ -2197,6 +2239,25 @@ static int changepw_cmd (int argc, char * const argv[]) {
 		return 1;
 	}
 
+	if (verbose) {
+		char *salt_utf8;
+		size_t salt_len;
+
+		fprintf(stderr, "Using the following parameters:\n"
+				"   Password Salt: ");
+
+		salt_utf8 = utf16le_to_utf8(salt, salt_bytes, &salt_len);
+		if (salt_utf8) {
+			fprintf(stderr, "\"%s\" ", salt_utf8);
+			free(salt_utf8);
+		}
+		hexdump(stderr, salt, salt_bytes);
+
+		fprintf(stderr, "\n"
+				"  Iteration Rnds: %lu\n"
+				"Trying to change password...\n", iterations);
+	}
+
 	err = changepw(wds, salt, salt_bytes, iterations, opw, opw_len, npw,
 			npw_len, key_size);
 	if (err) {
@@ -2211,6 +2272,9 @@ static int changepw_cmd (int argc, char * const argv[]) {
 		 *   Clear Security Block
 		 */
 		if (clear_sec_block) {
+			if (verbose)
+				fprintf(stderr, "Clearing Handy Store Security "
+						"Block...\n");
 			err = wds_write_handy_store_security_block(wds, NULL);
 			if (err)
 				fprintf(stderr, "Error: failed clearing Handy "
@@ -2227,6 +2291,9 @@ static int changepw_cmd (int argc, char * const argv[]) {
 		 * the Security Block (i.e. *not* overriden by salt or
 		 * iterations specified on the command line) and the new hint.
 		 */
+		if (verbose)
+			fprintf(stderr, "Updating Handy Store Security "
+					"Block...\n");
 		err = wds_write_handy_store_security_block(wds, &sb);
 		if (err)
 			fprintf(stderr, "Error: failed writing hint to Handy "

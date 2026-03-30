@@ -4,7 +4,7 @@
  *   A library for managing the password protection of external drives
  *   supported by the proprietary WD Security software.
  *
- * Copyright (C) 2025  Brandon Casey
+ * Copyright (C) 2025-2026  Brandon Casey
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -48,6 +48,36 @@ extern "C" {
 #define WD_SECURITY_CIPHER_AES_256_XTS  0x28
 #define WD_SECURITY_CIPHER_FDE          0x30
 
+/* Device Configuration bit-field constants */
+#define WD_SECURITY_DISABLE_SES_BIT   0x00000001
+#define WD_SECURITY_DISABLE_CDROM_BIT 0x00000002
+#define WD_SECURITY_DISABLE_AP_BIT    0x00000080
+#define WD_SECURITY_DISABLE_WL_BIT    0x00000100
+#define WD_SECURITY_2TB_LIMIT_BIT     0x00000200
+
+/* Device Operations bit-field constants */
+#define WD_SECURITY_ESATA15_BIT       0x00000001
+#define WD_SECURITY_LOOSE_SB2_BIT     0x00000002
+#define WD_SECURITY_ENCDEJ_BIT        0x00000100
+#define WD_SECURITY_CDMVALID_BIT      0x00000200
+#define WD_SECURITY_INVLCD_BIT        0x00010000
+
+/* Device Configuration/Operations Helper macros */
+#define WDS_SET(_bits, _bit)     ((_bits) |= (_bit))
+#define WDS_UNSET(_bits, _bit)   ((_bits) &= ~(_bit))
+#define WDS_IS_SET(_bits, _bit)  (((_bits) & (_bit)) == (_bit))
+#define WDS_DISABLE_SES(_bits)   WDS_IS_SET(_bits, WD_SECURITY_DISABLE_SES_BIT)
+#define WDS_DISABLE_CDROM(_bits) WDS_IS_SET(_bits, WD_SECURITY_DISABLE_CDROM_BIT)
+#define WDS_DISABLE_AP(_bits)    WDS_IS_SET(_bits, WD_SECURITY_DISABLE_AP_BIT)
+#define WDS_DISABLE_WL(_bits)    WDS_IS_SET(_bits, WD_SECURITY_DISABLE_WL_BIT)
+#define WDS_2TB_LIMIT(_bits)     WDS_IS_SET(_bits, WD_SECURITY_2TB_LIMIT_BIT)
+
+#define WDS_ESATA15(_bits)       WDS_IS_SET(_bits, WD_SECURITY_ESATA15_BIT)
+#define WDS_LOOSE_SB2(_bits)     WDS_IS_SET(_bits, WD_SECURITY_LOOSE_SB2_BIT)
+#define WDS_ENCDEJ(_bits)        WDS_IS_SET(_bits, WD_SECURITY_ENCDEJ_BIT)
+#define WDS_CDMVALID(_bits)      WDS_IS_SET(_bits, WD_SECURITY_CDMVALID_BIT)
+#define WDS_INVLCD(_bits)        WDS_IS_SET(_bits, WD_SECURITY_INVLCD_BIT)
+
 /* Error Constants */
 #define WD_SECURITY_ESYSCALL    1  /* syscall failed, errno is set */
 #define WD_SECURITY_ESIG        2  /* bad signature */
@@ -63,6 +93,7 @@ extern "C" {
 #define WD_SECURITY_ECIPHER    12  /* cipher/length mismatch (unknown cipher) */
 #define WD_SECURITY_ELOCKED    13  /* attempt to change pw when device locked */
 #define WD_SECURITY_ENOTSUP    14  /* not an SG device or driver too old */
+#define WD_SECURITY_EBADRESP   15  /* unexpected response from SCSI device */
 
 #define WD_SECURITY_ESCSI      32  /* info != SG_INFO_OK,  */
 #define WD_SECURITY_ESENSE     33  /* SCSI status is CHECK_CONDITION */
@@ -121,6 +152,16 @@ struct wds_handy_store_user_block {
 	uint8_t label[64];    /* drive label, UTF-16LE */
 };
 
+struct wds_config_mode_page {
+	uint32_t flags;       /* device configuration bit-field */
+};
+
+struct wds_operations_mode_page {
+	uint32_t flags;       /* device operations bit-field */
+	uint8_t power_led_brite;
+	uint8_t backlight_brite;
+};
+
 extern const char* wds_cipher_to_string (unsigned cipher);
 extern uint8_t wds_string_to_cipher (const char* name);
 extern const char* wds_status_to_string (unsigned status);
@@ -151,6 +192,20 @@ extern int wds_write_handy_store_security_block (wds_handle *wds,
 		const struct wds_handy_store_security_block *hs);
 extern int wds_write_handy_store_user_block (wds_handle *wds,
 		const struct wds_handy_store_user_block *hs);
+
+extern int wds_read_config_mode_page (wds_handle *wds,
+		struct wds_config_mode_page *mode_page,
+		struct wds_config_mode_page *mode_page_mask);
+extern int wds_read_operations_mode_page (wds_handle *wds,
+		struct wds_operations_mode_page *mode_page,
+		struct wds_operations_mode_page *mode_page_mask);
+
+extern int wds_write_config_mode_page (wds_handle *wds,
+		const struct wds_config_mode_page *mode_page,
+		const struct wds_config_mode_page *mode_page_mask);
+extern int wds_write_operations_mode_page (wds_handle *wds,
+		const struct wds_operations_mode_page *mode_page,
+		const struct wds_operations_mode_page *mode_page_mask);
 
 extern int wds_generate_kek (const uint8_t *salt, size_t salt_bytes,
 			     const uint8_t *pw, size_t pw_bytes,

@@ -4,7 +4,7 @@
  *   A library for managing the password protection of external drives
  *   supported by the proprietary WD Security software.
  *
- * Copyright (C) 2025  Brandon Casey
+ * Copyright (C) 2025-2026  Brandon Casey
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -54,11 +54,16 @@
 
 /* WD Security constants and limits */
 #define WD_SECURITY_VSC_SIG 0x45
+#define WD_SECURITY_MODE_PAGE_SIG 0x30
 #define WD_SECURITY_MAX_CIPHERS 255
 
 /* Addresses of known Handy Store blocks */
 #define WD_SECURITY_HANDY_STORE_SECURITY_BLOCK 1
 #define WD_SECURITY_HANDY_STORE_USER_BLOCK     2
+
+/* SCSI Mode Sense Page Codes */
+#define WD_SECURITY_DEVICE_CONFIGURATION_PAGE_CODE 0x20
+#define WD_SECURITY_OPERATIONS_PAGE_CODE 0x21
 
 /* setpw flag bits */
 #define WD_SECURITY_OLDDEF 0x01   /* current password is default */
@@ -94,9 +99,30 @@
 
 /* SCSI sense buffer constants */
 
+#define SCSI_ASC_INVALID_COMMAND_OPERATION 0x20
 #define SCSI_ASC_INVALID_CDB_FIELD 0x24
 #define SCSI_ASC_INVALID_PARAM_FIELD 0x26
 #define SCSI_ASC_SECURITY_ERROR 0x74
+
+/* SCSI Mode Sense/Select constants */
+
+/* Page Control constants */
+#define SCSI_MS_PC_CURRENT     0x00
+#define SCSI_MS_PC_CHANGEABLE  0x01
+#define SCSI_MS_PC_DEFAULT     0x02
+#define SCSI_MS_PC_SAVED       0x03
+#define SCSI_MS_PC_MASK        0xc0
+
+/* Page Code bits */
+#define SCSI_MS_PAGE_CODE_MASK 0x3f
+#define SCSI_MS_SPF_BIT        0x40
+#define SCSI_MS_PS_BIT         0x80
+
+#define SCSI_MS_PAGE_CODE(_bits) ((_bits) & SCSI_MS_PAGE_CODE_MASK)
+
+/* flag bits */
+#define SCSI_MS_SP_BIT         0x01
+#define SCSI_MS_DBD_BIT        0x08
 
 /* SCSI Error helper macros */
 
@@ -317,6 +343,7 @@ static const char* const error_names[] = {
 	"Bad cipher or key length", /* ECIPHER */
 	"Locked",                   /* ELOCKED */
 	"Not supported",            /* ENOTSUP */
+	"Bad SCSI response",        /* EBADRESP */
 };
 
 /* WD Vendor Specific SCSI Commands (VSC) Command Descriptor Block (CDB) */
@@ -346,6 +373,43 @@ struct __attribute__((packed)) wds_vsc_cdb {
 	{ 0xd8, 0x00, 0x00000000, 0x00, 0x0000, 0x00 }
 #define WD_SECURITY_VSC_CDB_HANDY_STORE_WR_INIT \
 	{ 0xda, 0x00, 0x00000000, 0x00, 0x0000, 0x00 }
+
+/* SCSI Mode Sense/Select Command Descriptor Block (CDB) */
+
+struct __attribute__((packed)) mode_sense_6_cdb {
+	uint8_t code;            /* 0x1a */
+	uint8_t flag_bits;       /* DBD:3 */
+	uint8_t page_code_bits;  /* PC:6-7 PageCode:0-5 */
+	uint8_t subpage_code;
+	uint8_t length;
+	uint8_t control;
+};
+
+struct __attribute__((packed)) mode_select_6_cdb {
+	uint8_t code;            /* 0x15 */
+	uint8_t flag_bits;       /* PF:4 RTD:1 SP:0 */
+	uint8_t reserved[2];
+	uint8_t length;
+	uint8_t control;
+};
+
+struct __attribute__((packed)) mode_sense_10_cdb {
+	uint8_t code;            /* 0x5a */
+	uint8_t flag_bits;       /* LLBAA:4 DBD:3 */
+	uint8_t page_code_bits;  /* PC:6-7 PageCode:0-5 */
+	uint8_t subpage_code;
+	uint8_t reserved[3];
+	uint16_t length;
+	uint8_t control;
+};
+
+struct __attribute__((packed)) mode_select_10_cdb {
+	uint8_t code;           /* 0x55 */
+	uint8_t flag_bits;      /* PF:4 SP:0 */
+	uint8_t reserved[5];
+	uint16_t length;
+	uint8_t control;
+};
 
 /* WD Security Response Payloads */
 
@@ -412,6 +476,48 @@ struct __attribute__((packed)) wds_handy_store_user_block_packed {
 	uint8_t label[64];
 	uint8_t reserved2[439];
 	uint8_t checksum;
+};
+
+/* WD Security Mode Sense/Select Payloads */
+
+struct __attribute__((packed)) scsi_mode_param_header6 {
+	uint8_t mode_data_length;
+	uint8_t medium_type;
+	uint8_t flag_bits;      /* WP:7 DPOFUA:4 */
+	uint8_t block_desc_length;
+};
+
+struct __attribute__((packed)) scsi_mode_param_header10 {
+	uint16_t mode_data_length;
+	uint8_t medium_type;
+	uint8_t flag1_bits;     /* WP:7 DPOFUA:4 */
+	uint8_t flag2_bits;     /* LONGLBA:0 */
+	uint8_t reserved;
+	uint16_t block_descriptor_length;
+};
+
+struct __attribute__((packed)) wds_config_mode_page_packed {
+	uint8_t page_code_bits; /* PS:7 SPF:6 PageCode:0-5 */
+	uint8_t page_length;
+	uint8_t sig;
+	uint8_t reserved1;
+	uint8_t flag1_bits;     /* DisAP:7 DisCD:1 DisSES:0 */
+	uint8_t flag2_bits;     /* 2TBL:1 DisWL:0 */
+	uint8_t reserved2[2];
+};
+
+struct __attribute__((packed)) wds_operations_mode_page_packed {
+	uint8_t page_code_bits; /* PS:7 SPF:6 PageCode:0-5 */
+	uint8_t page_length;
+	uint8_t sig;
+	uint8_t reserved1;
+	uint8_t flag1_bits;     /* LOOSESB2:1 ESATA15:0 */
+	uint8_t flag2_bits;     /* CDMVALID:1 ENCDEJ:0 */
+	uint8_t reserved2[2];
+	uint8_t power_led_brite;
+	uint8_t backlight_brite;
+	uint8_t flag3_bits;     /* INVLCD:0 */
+	uint8_t reserved3;
 };
 
 /* SCSI Sense Buffer Data
@@ -573,7 +679,8 @@ static int decode_sense_data_generic (const struct sense_data_packed *sdp)
 }
 
 static int scsi_cmd (int fd, unsigned int timeout, unsigned char *cmdp,
-		unsigned char cmd_len, int dxfer_direction, void *dxferp,
+		unsigned char cmd_len, int dxfer_direction,
+		unsigned short iovec_count, void *dxferp,
 		unsigned int *dxfer_len,
 		int (*decode_sense) (const struct sense_data_packed*))
 {
@@ -589,6 +696,7 @@ static int scsi_cmd (int fd, unsigned int timeout, unsigned char *cmdp,
 	sg_hdr.dxfer_direction = dxfer_direction;
 	sg_hdr.cmd_len = cmd_len;
 	sg_hdr.mx_sb_len = sizeof(sensb);
+	sg_hdr.iovec_count = iovec_count;
 	sg_hdr.dxfer_len = *dxfer_len;
 	sg_hdr.dxferp = dxferp;
 	sg_hdr.cmdp = cmdp;
@@ -712,7 +820,7 @@ struct wds_encryption_status* wds_get_status (struct wds_handle *wds, int *err)
 
 	dxfer_len = sizeof(buf);
 	e = scsi_cmd(wds->fd, wds->timeout, (unsigned char*)&cdb, sizeof(cdb),
-			SG_DXFER_FROM_DEV, buf, &dxfer_len, NULL);
+			SG_DXFER_FROM_DEV, 0, buf, &dxfer_len, NULL);
 	if (e) {
 		if (err)
 			*err = e;
@@ -740,6 +848,551 @@ struct wds_encryption_status* wds_get_status (struct wds_handle *wds, int *err)
 	return es;
 }
 
+static int scsi_set_mode_page6 (int fd, unsigned int timeout, int save_pages,
+		void *mp, uint8_t mp_len)
+{
+	sg_iovec_t iov[2];
+	struct scsi_mode_param_header6 mp_hdr;
+	struct mode_select_6_cdb cdb;
+	unsigned int dxfer_len;
+
+	memset(&mp_hdr, 0, sizeof(mp_hdr));
+	/* mp_hdr.mode_data_length =; reserved for mode select */
+	mp_hdr.medium_type = TYPE_DISK; /* really necessary? */
+
+	iov[0].iov_base = &mp_hdr;
+	iov[0].iov_len = sizeof(mp_hdr);
+	iov[1].iov_base = mp;
+	iov[1].iov_len = mp_len;
+
+	dxfer_len = iov[0].iov_len + iov[1].iov_len;
+
+	memset(&cdb, 0, sizeof(cdb));
+
+	cdb.code = MODE_SELECT;
+	if (save_pages)
+		cdb.flag_bits = SCSI_MS_SP_BIT;
+	cdb.length = dxfer_len;
+
+	return scsi_cmd(fd, timeout, (unsigned char*)&cdb, sizeof(cdb),
+		SG_DXFER_TO_DEV, ARRAY_LEN(iov), iov, &dxfer_len, NULL);
+}
+
+static int scsi_set_mode_page10 (int fd, unsigned int timeout, int save_pages,
+		void *mp, uint8_t mp_len)
+{
+	sg_iovec_t iov[2];
+	struct scsi_mode_param_header10 mp_hdr;
+	struct mode_select_10_cdb cdb;
+	unsigned int dxfer_len;
+
+	memset(&mp_hdr, 0, sizeof(mp_hdr));
+	/* mp_hdr.mode_data_length =; reserved for mode select */
+	mp_hdr.medium_type = TYPE_DISK; /* really necessary? */
+
+	iov[0].iov_base = &mp_hdr;
+	iov[0].iov_len = sizeof(mp_hdr);
+	iov[1].iov_base = mp;
+	iov[1].iov_len = mp_len;
+
+	dxfer_len = iov[0].iov_len + iov[1].iov_len;
+
+	memset(&cdb, 0, sizeof(cdb));
+
+	cdb.code = MODE_SELECT_10;
+	if (save_pages)
+		cdb.flag_bits = SCSI_MS_SP_BIT;
+	cdb.length = htobe16((uint16_t)dxfer_len);
+
+	return scsi_cmd(fd, timeout, (unsigned char*)&cdb, sizeof(cdb),
+		SG_DXFER_TO_DEV, ARRAY_LEN(iov), iov, &dxfer_len, NULL);
+}
+
+static int scsi_set_mode_page (int fd, unsigned int timeout, int save_pages,
+		void *mp, uint8_t mp_len)
+{
+	int err;
+
+	err = scsi_set_mode_page10(fd, timeout, save_pages, mp, mp_len);
+	if (err) {
+		if ((WDS_ESCSI_STATUS(err) == WD_SECURITY_EKCQ &&
+		     WDS_EKCQ_SENSE_KEY(err) == ILLEGAL_REQUEST &&
+		     WDS_EKCQ_ASC(err) == SCSI_ASC_INVALID_COMMAND_OPERATION) ||
+		    (WDS_ESCSI_STATUS(err) == WD_SECURITY_ESENSE &&
+		     WDS_ESENSE_SENSE_KEY(err) == ILLEGAL_REQUEST))
+		{
+			/* If the SCSI command fails with ILLEGAL_REQUEST, then
+			 * maybe the device doesn't support 10-byte commands.
+			 * Retry using the 6-byte command */
+			return scsi_set_mode_page6(fd, timeout, save_pages, mp,
+				mp_len);
+		}
+	}
+
+	return err;
+}
+
+static int scsi_get_mode_page_6 (int fd, unsigned int timeout,
+		uint8_t page_control, uint8_t page_code, void *mp,
+		uint8_t *mp_len)
+{
+	sg_iovec_t iov[2];
+	struct scsi_mode_param_header6 mp_hdr;
+	struct mode_sense_6_cdb cdb;
+	unsigned int dxfer_len;
+	int err;
+
+	iov[0].iov_base = &mp_hdr;
+	iov[0].iov_len = sizeof(mp_hdr);
+	iov[1].iov_base = mp;
+	iov[1].iov_len = *mp_len;
+
+	dxfer_len = iov[0].iov_len + iov[1].iov_len;
+
+	memset(&cdb, 0, sizeof(cdb));
+
+	cdb.code = MODE_SENSE;
+	cdb.flag_bits = SCSI_MS_DBD_BIT;  /* disable block descriptors */
+	cdb.page_code_bits = (page_control << 6 & SCSI_MS_PC_MASK) |
+			     (page_code & SCSI_MS_PAGE_CODE_MASK);
+	cdb.length = dxfer_len;
+
+	err = scsi_cmd(fd, timeout, (unsigned char*)&cdb, sizeof(cdb),
+		SG_DXFER_FROM_DEV, ARRAY_LEN(iov), iov, &dxfer_len, NULL);
+	if (err)
+		return err;
+
+	if (dxfer_len < sizeof(mp_hdr)) {
+		mesg(ERROR, "SCSI Mode Page(6) too small, expected %zu, got %u",
+			sizeof(mp_hdr), dxfer_len);
+		return WD_SECURITY_EBADRESP;
+	}
+
+	mesg(DEBUG2, "SCSI Mode Page(6) Header: "
+		"mode data length (%" PRIu8 ") "
+		"medium type (%" PRIu8 ") "
+		"block descriptor length (%" PRIu8 ")",
+		mp_hdr.mode_data_length,
+		mp_hdr.medium_type,
+		mp_hdr.block_desc_length);
+
+	/* Should never happen since we set the DBD bit */
+	if (mp_hdr.block_desc_length) {
+		mesg(ERROR, "SCSI Mode Page(6) non-zero block descriptor "
+			"length");
+		return WD_SECURITY_EBADRESP;
+	}
+
+	if ((unsigned)mp_hdr.mode_data_length + 1 < dxfer_len) {
+		mesg(WARNING, "SCSI Mode Page(6) data length (%" PRIu8 ") is "
+			"smaller than dxfer_len(%u)",
+			mp_hdr.mode_data_length + 1,
+			dxfer_len);
+		dxfer_len = mp_hdr.mode_data_length + 1;
+	}
+
+	if (dxfer_len > sizeof(mp_hdr))
+		*mp_len = dxfer_len - sizeof(mp_hdr);
+	else
+		*mp_len = 0;
+
+	return 0;
+}
+
+static int scsi_get_mode_page_10 (int fd, unsigned int timeout,
+		uint8_t page_control, uint8_t page_code, void *mp,
+		uint8_t *mp_len)
+{
+	sg_iovec_t iov[2];
+	struct scsi_mode_param_header10 mp_hdr;
+	struct mode_sense_10_cdb cdb;
+	unsigned int dxfer_len;
+	uint16_t mode_data_length;
+	uint16_t block_desc_length;
+	int err;
+
+	iov[0].iov_base = &mp_hdr;
+	iov[0].iov_len = sizeof(mp_hdr);
+	iov[1].iov_base = mp;
+	iov[1].iov_len = *mp_len;
+
+	dxfer_len = iov[0].iov_len + iov[1].iov_len;
+
+	memset(&cdb, 0, sizeof(cdb));
+
+	cdb.code = MODE_SENSE_10;
+	cdb.flag_bits = SCSI_MS_DBD_BIT; /* disable block descriptors */
+	cdb.page_code_bits = (page_control << 6 & SCSI_MS_PC_MASK) |
+			     (page_code & SCSI_MS_PAGE_CODE_MASK);
+	cdb.length = htobe16((uint16_t)dxfer_len);
+
+	err = scsi_cmd(fd, timeout, (unsigned char*)&cdb, sizeof(cdb),
+		SG_DXFER_FROM_DEV, 2, iov, &dxfer_len, NULL);
+	if (err)
+		return err;
+
+	if (dxfer_len < sizeof(mp_hdr)) {
+		mesg(ERROR, "SCSI Mode Page(10) too small, expected %zu, got %u",
+			sizeof(mp_hdr), dxfer_len);
+		return WD_SECURITY_EBADRESP;
+	}
+
+	mode_data_length = be16toh(mp_hdr.mode_data_length);
+	block_desc_length = be16toh(mp_hdr.block_descriptor_length);
+
+	mesg(DEBUG2, "SCSI Mode Page(10) Header: "
+		"mode data length (%" PRIu16 ") "
+		"medium type (%" PRIu8 ") "
+		"block descriptor length (%" PRIu16 ")",
+		mode_data_length,
+		mp_hdr.medium_type,
+		block_desc_length);
+
+	/* Should never happen since we set the DBD bit */
+	if (block_desc_length) {
+		mesg(ERROR, "SCSI Mode Page(10) non-zero block descriptor "
+			"length");
+		return WD_SECURITY_EBADRESP;
+	}
+
+	if ((unsigned)mode_data_length + sizeof(uint16_t) < dxfer_len) {
+		mesg(WARNING, "SCSI Mode Page(10) data length (%zu) is "
+			"smaller than dxfer_len(%u)",
+			mode_data_length + sizeof(uint16_t),
+			dxfer_len);
+		dxfer_len = mode_data_length + sizeof(uint16_t);
+	}
+
+	if (dxfer_len > sizeof(mp_hdr))
+		*mp_len = dxfer_len - sizeof(mp_hdr);
+	else
+		*mp_len = 0;
+
+	return 0;
+}
+
+static int scsi_get_mode_page (int fd, unsigned int timeout,
+		uint8_t page_control, uint8_t page_code, void *mp,
+		uint8_t *mp_len)
+{
+	int err;
+
+	err = scsi_get_mode_page_10(fd, timeout, page_control, page_code, mp,
+		mp_len);
+	if (err) {
+		if ((WDS_ESCSI_STATUS(err) == WD_SECURITY_EKCQ &&
+		     WDS_EKCQ_SENSE_KEY(err) == ILLEGAL_REQUEST &&
+		     WDS_EKCQ_ASC(err) == SCSI_ASC_INVALID_COMMAND_OPERATION) ||
+		    (WDS_ESCSI_STATUS(err) == WD_SECURITY_ESENSE &&
+		     WDS_ESENSE_SENSE_KEY(err) == ILLEGAL_REQUEST))
+		{
+			/* If the SCSI command fails with ILLEGAL_REQUEST, then
+			 * maybe the device doesn't support the 10-byte
+			 * mode sense command.  Try the 6-byte version */
+			return scsi_get_mode_page_6(fd, timeout, page_control,
+				page_code, mp, mp_len);
+		}
+	}
+
+	return err;
+}
+
+static void unpack_config_mode_page (
+		const struct wds_config_mode_page_packed *packed,
+		struct wds_config_mode_page* unpacked)
+{
+	unpacked->flags = packed->flag1_bits | packed->flag2_bits << 8;
+}
+
+static void pack_config_mode_page_masked (
+		const struct wds_config_mode_page *unpacked,
+		const struct wds_config_mode_page *unpacked_mask,
+		struct wds_config_mode_page_packed *packed)
+{
+	uint8_t obits;
+	uint8_t nbits;
+	uint8_t mask;
+
+	obits = packed->flag1_bits;
+	nbits = unpacked->flags & 0xff;
+	mask = unpacked_mask->flags & 0xff;
+	packed->flag1_bits = (obits & ~mask) | (nbits & mask);
+
+	obits = packed->flag2_bits;
+	nbits = (unpacked->flags >> 8) & 0xff;
+	mask = (unpacked_mask->flags >> 8) & 0xff;
+	packed->flag2_bits = (obits & ~mask) | (nbits & mask);
+}
+
+static int read_config_mode_page (struct wds_handle *wds, uint8_t page_control,
+		struct wds_config_mode_page_packed *mpp)
+{
+	int err;
+	uint8_t len = sizeof(*mpp);
+
+	err = scsi_get_mode_page(wds->fd, wds->timeout, page_control,
+		WD_SECURITY_DEVICE_CONFIGURATION_PAGE_CODE, mpp, &len);
+	if (err)
+		return err;
+
+	if (len < sizeof(*mpp)) {
+		mesg(ERROR, "Device Configuration mode page too small, "
+			"expected %zu, got %" PRIu8,
+			sizeof(*mpp), len);
+		return WD_SECURITY_EBADRESP;
+	}
+
+	if (WDS_IS_SET(mpp->page_code_bits, SCSI_MS_SPF_BIT)) {
+		mesg(ERROR, "Device Configuration mode page has SPF set");
+		return WD_SECURITY_EBADRESP;
+	}
+
+	mesg(DEBUG2, "Device Configuration mode page: "
+		"parameters saveable (%d) "
+		"page code (0x%.2" PRIx8 ") "
+		"page length (%" PRIu8 ") "
+		"signature (0x%.2" PRIx8 ")",
+		WDS_IS_SET(mpp->page_code_bits, SCSI_MS_PS_BIT),
+		SCSI_MS_PAGE_CODE(mpp->page_code_bits),
+		mpp->page_length,
+		mpp->sig);
+
+	if (SCSI_MS_PAGE_CODE(mpp->page_code_bits) !=
+	    WD_SECURITY_DEVICE_CONFIGURATION_PAGE_CODE)
+	{
+		mesg(ERROR, "Device Configuration mode page bad page code, "
+				"expected 0x%.2" PRIx8 ", got 0x%.2" PRIx8,
+				WD_SECURITY_DEVICE_CONFIGURATION_PAGE_CODE,
+				SCSI_MS_PAGE_CODE(mpp->page_code_bits));
+		return WD_SECURITY_EBADRESP;
+	}
+
+	if (page_control != SCSI_MS_PC_CHANGEABLE &&
+	    mpp->sig != WD_SECURITY_MODE_PAGE_SIG)
+	{
+		mesg(ERROR, "Device Configuration mode page bad signature, "
+				"expected 0x%.2" PRIx8 ", got 0x%.2" PRIx8,
+				WD_SECURITY_MODE_PAGE_SIG, mpp->sig);
+		return WD_SECURITY_ESIG;
+	}
+
+	if (offsetof(struct wds_config_mode_page_packed, page_length) +
+		mpp->page_length + 1 < sizeof(*mpp))
+	{
+		mesg(ERROR, "Device Configuration mode page short page length "
+			"(%" PRIu8 ")", mpp->page_length);
+		return WD_SECURITY_EBADRESP;
+	}
+
+	return 0;
+}
+
+int wds_read_config_mode_page (struct wds_handle *wds,
+		struct wds_config_mode_page *mode_page,
+		struct wds_config_mode_page *changeable)
+{
+	struct wds_config_mode_page_packed mpp;
+	int err;
+
+	err = read_config_mode_page(wds, SCSI_MS_PC_CURRENT, &mpp);
+	if (err)
+		return err;
+
+	unpack_config_mode_page(&mpp, mode_page);
+
+	if (changeable) {
+		if (read_config_mode_page(wds, SCSI_MS_PC_CHANGEABLE, &mpp)) {
+			mesg(WARNING, "failed reading \"changeable\" Device "
+				"Configuration mode page, mark unchangeable");
+			memset(changeable, 0, sizeof(*changeable));
+		} else
+			unpack_config_mode_page(&mpp, changeable);
+	}
+
+	return 0;
+}
+
+int wds_write_config_mode_page (struct wds_handle *wds,
+		const struct wds_config_mode_page *mode_page,
+		const struct wds_config_mode_page *mode_page_mask)
+{
+	struct wds_config_mode_page_packed mpp;
+	int save_pages;
+	int err;
+
+	err = read_config_mode_page(wds, SCSI_MS_PC_CURRENT, &mpp);
+	if (err)
+		return err;
+
+	pack_config_mode_page_masked(mode_page, mode_page_mask, &mpp);
+
+	save_pages = WDS_IS_SET(mpp.page_code_bits, SCSI_MS_PS_BIT);
+
+	/* clear Parameters Saveable bit, it's reserved during mode-select */
+	mpp.page_code_bits &= ~SCSI_MS_PS_BIT;
+
+	return scsi_set_mode_page(wds->fd, wds->timeout, save_pages, &mpp,
+		sizeof(mpp));
+}
+
+static void unpack_operations_mode_page (
+		const struct wds_operations_mode_page_packed *packed,
+		struct wds_operations_mode_page* unpacked)
+{
+	unpacked->flags = packed->flag1_bits |
+			  ((uint32_t)packed->flag2_bits << 8) |
+			  ((uint32_t)packed->flag3_bits << 16);
+
+	unpacked->power_led_brite = packed->power_led_brite;
+	unpacked->backlight_brite = packed->backlight_brite;
+}
+
+static void pack_operations_mode_page_masked (
+		const struct wds_operations_mode_page* unpacked,
+		const struct wds_operations_mode_page* unpacked_mask,
+		struct wds_operations_mode_page_packed *packed)
+{
+	uint8_t obits;
+	uint8_t nbits;
+	uint8_t mask;
+
+	obits = packed->flag1_bits;
+	nbits = unpacked->flags & 0xff;
+	mask = unpacked_mask->flags & 0xff;
+	packed->flag1_bits = (obits & ~mask) | (nbits & mask);
+
+	obits = packed->flag2_bits;
+	nbits = (unpacked->flags >> 8) & 0xff;
+	mask = (unpacked_mask->flags >> 8) & 0xff;
+	packed->flag2_bits = (obits & ~mask) | (nbits & mask);
+
+	obits = packed->flag3_bits;
+	nbits = (unpacked->flags >> 16) & 0xff;
+	mask = (unpacked_mask->flags >> 16) & 0xff;
+	packed->flag3_bits = (obits & ~mask) | (nbits & mask);
+
+	if (unpacked_mask->power_led_brite)
+		packed->power_led_brite = unpacked->power_led_brite;
+	if (unpacked_mask->backlight_brite)
+		packed->backlight_brite = unpacked->backlight_brite;
+}
+
+static int read_operations_mode_page (int fd, unsigned timeout,
+		uint8_t page_control,
+		struct wds_operations_mode_page_packed *mpp)
+{
+	int err;
+	uint8_t len = sizeof(*mpp);
+
+	err = scsi_get_mode_page(fd, timeout, page_control,
+		WD_SECURITY_OPERATIONS_PAGE_CODE, mpp, &len);
+	if (err)
+		return err;
+
+	if (len < sizeof(*mpp)) {
+		mesg(ERROR, "Device Operations mode page too small, "
+			"expected %zu, got %" PRIu8,
+			sizeof(*mpp), len);
+		return WD_SECURITY_EBADRESP;
+	}
+
+	if (WDS_IS_SET(mpp->page_code_bits, SCSI_MS_SPF_BIT)) {
+		mesg(ERROR, "Device Operations mode page has SPF set");
+		return WD_SECURITY_EBADRESP;
+	}
+
+	mesg(DEBUG2, "Device Operations mode page: "
+		"parameters saveable: (%d) "
+		"page code (0x%.2" PRIx8 ") "
+		"page length (%" PRIu8 ") "
+		"signature (0x%.2" PRIx8 ")",
+		WDS_IS_SET(mpp->page_code_bits, SCSI_MS_PS_BIT),
+		SCSI_MS_PAGE_CODE(mpp->page_code_bits),
+		mpp->page_length,
+		mpp->sig);
+
+	if (SCSI_MS_PAGE_CODE(mpp->page_code_bits) !=
+	    WD_SECURITY_OPERATIONS_PAGE_CODE)
+	{
+		mesg(ERROR, "Device Operations mode page bad page code, "
+				"expected 0x%.2" PRIx8 ", got 0x%.2" PRIx8,
+				WD_SECURITY_OPERATIONS_PAGE_CODE,
+				SCSI_MS_PAGE_CODE(mpp->page_code_bits));
+		return WD_SECURITY_EBADRESP;
+	}
+
+	if (page_control != SCSI_MS_PC_CHANGEABLE &&
+	    mpp->sig != WD_SECURITY_MODE_PAGE_SIG)
+	{
+		mesg(ERROR, "Device Operations mode page bad signature, "
+				"expected 0x%.2" PRIx8 ", got 0x%.2" PRIx8,
+				WD_SECURITY_MODE_PAGE_SIG, mpp->sig);
+		return WD_SECURITY_ESIG;
+	}
+
+	if (offsetof(struct wds_operations_mode_page_packed, page_length) +
+		mpp->page_length + 1 < sizeof(*mpp))
+	{
+		mesg(ERROR, "Device Operations mode page short page length (%"
+			PRIu8 ")", mpp->page_length);
+		return WD_SECURITY_EBADRESP;
+	}
+
+	return 0;
+}
+
+int wds_read_operations_mode_page (struct wds_handle *wds,
+		struct wds_operations_mode_page *mode_page,
+		struct wds_operations_mode_page *changeable)
+{
+	struct wds_operations_mode_page_packed mpp;
+	int err;
+
+	err = read_operations_mode_page(wds->fd, wds->timeout,
+			SCSI_MS_PC_CURRENT, &mpp);
+	if (err)
+		return err;
+
+	unpack_operations_mode_page(&mpp, mode_page);
+
+	if (changeable) {
+		if (read_operations_mode_page(wds->fd, wds->timeout,
+			    SCSI_MS_PC_CHANGEABLE, &mpp))
+		{
+			mesg(WARNING, "failed reading \"changeable\" Device "
+				"Operations mode page, mark unchangeable");
+			memset(changeable, 0, sizeof(*changeable));
+		} else
+			unpack_operations_mode_page(&mpp, changeable);
+	}
+
+	return 0;
+}
+
+int wds_write_operations_mode_page (struct wds_handle *wds,
+		const struct wds_operations_mode_page *mode_page,
+		const struct wds_operations_mode_page *mode_page_mask)
+{
+	struct wds_operations_mode_page_packed mpp;
+	int save_pages;
+	int err;
+
+	err = read_operations_mode_page(wds->fd, wds->timeout,
+			SCSI_MS_PC_CURRENT, &mpp);
+	if (err)
+		return err;
+
+	pack_operations_mode_page_masked(mode_page, mode_page_mask, &mpp);
+
+	save_pages = WDS_IS_SET(mpp.page_code_bits, SCSI_MS_PS_BIT);
+
+	/* clear Parameters Saveable bit, it's reserved during mode-select */
+	mpp.page_code_bits &= ~SCSI_MS_PS_BIT;
+
+	return scsi_set_mode_page(wds->fd, wds->timeout, save_pages, &mpp,
+		sizeof(mpp));
+}
+
 int wds_read_handy_capacity (struct wds_handle *wds,
 		struct wds_handy_capacity *hc)
 {
@@ -751,7 +1404,7 @@ int wds_read_handy_capacity (struct wds_handle *wds,
 	dxfer_len = sizeof(hcp);
 
 	err = scsi_cmd(wds->fd, wds->timeout, (unsigned char*)&cdb, sizeof(cdb),
-			SG_DXFER_FROM_DEV, &hcp, &dxfer_len, NULL);
+			SG_DXFER_FROM_DEV, 0, &hcp, &dxfer_len, NULL);
 	if (err)
 		return err;
 
@@ -805,7 +1458,7 @@ static int wds_write_handy_store_blocks (struct wds_handle *wds, uint32_t block,
 
 	dxfer_len = *buf_len;
 	err = scsi_cmd(wds->fd, wds->timeout, (unsigned char*)&cdb, sizeof(cdb),
-			SG_DXFER_TO_DEV, (unsigned char*)buf, &dxfer_len,
+			SG_DXFER_TO_DEV, 0, (unsigned char*)buf, &dxfer_len,
 			decode_sense_data_handy_store);
 
 	/* Update buf_len to contain number of bytes actually transferred? */
@@ -879,7 +1532,7 @@ static int wds_read_handy_store_blocks (struct wds_handle *wds, uint32_t block,
 
 	dxfer_len = *buf_len;
 	err = scsi_cmd(wds->fd, wds->timeout, (unsigned char*)&cdb, sizeof(cdb),
-			SG_DXFER_FROM_DEV, (unsigned char*)buf, &dxfer_len, NULL);
+			SG_DXFER_FROM_DEV, 0, (unsigned char*)buf, &dxfer_len, NULL);
 	if (err)
 		return err;
 
@@ -1128,7 +1781,7 @@ int wds_unlock_kek (struct wds_handle *wds, const uint8_t *kek,
 
 	dxfer_len = unlock_param_len;
 	err = scsi_cmd(wds->fd, wds->timeout, (unsigned char*)&cdb, sizeof(cdb),
-			SG_DXFER_TO_DEV, (unsigned char*)unlock_param,
+			SG_DXFER_TO_DEV, 0, (unsigned char*)unlock_param,
 			&dxfer_len, decode_sense_data_unlock);
 
 	free(unlock_param);
@@ -1251,7 +1904,7 @@ int wds_changepw_kek (struct wds_handle *wds, const uint8_t *oldkek,
 
 	dxfer_len = param_len;
 	err = scsi_cmd(wds->fd, wds->timeout, (unsigned char*)&cdb, sizeof(cdb),
-		SG_DXFER_TO_DEV, (unsigned char*)param, &dxfer_len,
+		SG_DXFER_TO_DEV, 0, (unsigned char*)param, &dxfer_len,
 		decode_sense_data_changepw);
 
 	free(param);
@@ -1384,7 +2037,7 @@ int wds_erase (struct wds_handle *wds, const uint8_t reset_syn[4],
 
 	dxfer_len = param_len;
 	err = scsi_cmd(wds->fd, wds->timeout, (unsigned char*)&cdb, sizeof(cdb),
-		SG_DXFER_TO_DEV, (unsigned char*)param, &dxfer_len,
+		SG_DXFER_TO_DEV, 0, (unsigned char*)param, &dxfer_len,
 		decode_sense_data_erase);
 
 	free(param);

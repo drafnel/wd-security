@@ -259,6 +259,83 @@ blocks are named the Security Block and the User Block.
     *--wdp-utils*::::
       Force-enable compatibility quirks for wdpassport-utils.py.
 
+*config* [_OPTIONS_] _device_::
+
+Show or manipulate configuration parameters of _device_.
++
+Two SCSI mode pages are used to store Device Configuration parameters
+and Device Operations parameters.  These parameters may be displayed
+and, if the device allows, modified.
+
+  OPTIONS:::
+
+    *--disable-ap*::::
+    *--no-disable-ap*::::
+      Set the `DisAP` bit in the Device Configuration mode page, or
+      clear it.  The meaning of this setting is unknown.
+
+    *--disable-cdrom*::::
+    *--no-disable-cdrom*::::
+      Disable, or enable, the emulated CDROM device.  (`DisCD` bit in
+      the Device Configuration mode page)
++
+    *--disable-ses*::::
+    *--no-disable-ses*::::
+      Disable, or enable, the SCSI Enclosure Services support.
+      (`DisSES` bit in the Device Configuration mode page)
++
+    *--disable-wl*::::
+    *--no-disable-wl*::::
+      Set the `DisWL` bit in the Device Configuration mode page, or
+      clear it.  The meaning of this setting is unknown.
+
+    *--2tb-limit*::::
+    *--no-2tb-limit*::::
+      Limit, or not, the reported drive capacity to two terabytes (2TB).
+      (`2TBL` bit in the Device Configuration mode page)
+
+    *--cd-media-valid*::::
+    *--no-cd-media-valid*::::
+      Set the `CDMValid` bit in the Device Operations mode page, or
+      clear it.  The meaning of this setting is unknown.
+
+    *--enable-cd-eject*::::
+    *--no-enable-cd-eject*::::
+      Set the `ENCDEJ` bit in the Device Operations mode page, or clear
+      it.  The meaning of this setting is unknown.
+
+    *--esata15*::::
+    *--no-esata15*::::
+      Set the `ESATA15` bit in the Device Operations mode page, or clear
+      it.  The meaning of this setting is unknown.  Perhaps intended to
+      force 150MBps data transfer speeds on the eSATA port for
+      misbehaving SATA 1 chipsets.
+
+    *--invert-lcd*::::
+    *--no-invert-lcd*::::
+      Invert, or not, the pixels on devices having an LCD display.
+      (`INVLCD` bit in the Device Operations mode page)
+
+    *--lcd-backlight* _level_::::
+      Set the brightness of the LCD backlight to _level_.  _level_ must
+      have a value between `0` and `255`.  (`BACKLIGHT BRITE` field in
+      the Device Operations mode page)
+
+    *--loose-sb2*::::
+    *--no-loose-sb2*::::
+      Set the `LOOSESB2` bit in the Device Operations mode page, or
+      clear it.  The meaning of this setting is unknown.  Perhaps
+      related to Fibre Channel Single-Byte Command Code (SB-2).
+
+    *--power-led* _level_::::
+      Set the brightness of the power LED to _level_.  _level_ must have
+      a value between `0` and `255`.  (`POWER LED BRITE` field in the
+      Device Operations mode page)
+
+    *--quiet*::::
+      Be quiet and do not display the table of current configuration
+      parameters.
+
 == Automatic Unlocking
 
 If the _00-wd-security.rules_ rules file has been installed, then
@@ -439,6 +516,29 @@ Key size: 32
 Do not Combine key with on-device RNG
 Continue? [y/N]> _y_
 Clearing Handy Store Security Block...
+----
+====
+
+.Disable emulated CDROM device associated with /dev/sdb
+====
+----
+# wd-security config --disable-cdrom /dev/sdb
+
+--- Device Configuration
+        *Disable SES: no
+      *Disable CDROM: yes
+          Disable AP: no
+  Disable White List: no
+           2TB Limit: no
+
+--- Device Operations
+             eSATA15: no
+           Loose SB2: no
+    *Enable CD Eject: no
+     *CD Media Valid: yes
+          *Power LED: 255
+       LCD Backlight: 0
+          Invert LCD: no
 ----
 ====
 

@@ -4,7 +4,7 @@
  *   Manage the password protection of external drives supported by the
  *   proprietary WD Security software.
  *
- * Copyright (C) 2025  Brandon Casey
+ * Copyright (C) 2025-2026  Brandon Casey
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -1325,6 +1325,299 @@ static int handy_store_cmd (int argc, char * const argv[]) {
 	return err;
 }
 
+static void config_cmd_help (const char *name) {
+	subcmd_usage(stdout, name);
+	printf("\n"
+	       "Show or manipulate configuration parameters of <device>\n"
+	       "\n"
+	       "Displays a table of device configuration parameters.  Those\n"
+	       "prefixed with '*' may be modified.\n"
+	       "\n"
+	       "Each boolean switch described below has a '--no-' prefixed\n"
+	       "counterpart to reverse the behavior, e.g. '--no-disable-ap'.\n"
+	       "\n"
+	       "(?) - the meaning of the parameter is unknown\n"
+	       "\n"
+	       "OPTIONS\n"
+	       "--disable-ap           disable AP (?)\n"
+	       "--disable-cdrom        disable emulated CDROM device\n"
+	       "--disable-ses          disable SCSI Enclosure Services\n"
+	       "--disable-wl           disable white list (?)\n"
+	       "--2tb-limit            limit reported capacity to 2TB\n"
+	       "\n"
+	       "--cd-media-valid       set CD media valid (?)\n"
+	       "--enable-cd-eject      enable CD eject (?)\n"
+	       "--esata15              force 150MBps transfer speed (?)\n"
+	       "--invert-lcd           invert LCD display\n"
+	       "--lcd-backlight <num>  set brightness of LCD backlight (0-255)\n"
+	       "--loose-sb2            Fibre Channel \"loose\" SB-2 (?)\n"
+	       "--power-led <num>      set brightness of power LED (0-255)\n"
+	       "--quiet                do not display table of current\n"
+	       "                       configuration parameters\n"
+	       "--verbose              increase verbosity\n"
+	       "--help                 this text\n"
+	       "\n");
+}
+
+static int config_cmd (int argc, char * const argv[]) {
+	const char *devpath;
+	wds_handle *wds;
+	struct wds_config_mode_page cfg;
+	struct wds_config_mode_page cfg_mask;
+	struct wds_operations_mode_page ops;
+	struct wds_operations_mode_page ops_mask;
+	int quiet = 0;
+	int err = 0;
+	int err2 = 0;
+	int opt;
+	const struct option long_options[] = {
+		{ "help", no_argument, NULL, 'h' },
+		{ "verbose", no_argument, NULL, 'v' },
+		{ "quiet", no_argument, NULL, 'q' },
+		{ "disable-ap", no_argument, NULL, 'a' },
+		{ "no-disable-ap", no_argument, NULL, 'A' },
+		{ "enable-ap", no_argument, NULL, 'A' },
+		{ "disable-cdrom", no_argument, NULL, 'c' },
+		{ "no-disable-cdrom", no_argument, NULL, 'C' },
+		{ "enable-cdrom", no_argument, NULL, 'C' },
+		{ "disable-ses", no_argument, NULL, 's' },
+		{ "no-disable-ses", no_argument, NULL, 'S' },
+		{ "enable-ses", no_argument, NULL, 'S' },
+		{ "2tb-limit", no_argument, NULL, 't' },
+		{ "no-2tb-limit", no_argument, NULL, 'T' },
+		{ "disable-wl", no_argument, NULL, 'w' },
+		{ "no-disable-wl", no_argument, NULL, 'W' },
+		{ "enable-wl", no_argument, NULL, 'W' },
+		{ "esata15", no_argument, NULL, 'e' },
+		{ "no-esata15", no_argument, NULL, 'E' },
+		{ "loose-sb2", no_argument, NULL, 'l' },
+		{ "no-loose-sb2", no_argument, NULL, 'L' },
+		{ "cd-media-valid", no_argument, NULL, 'm' },
+		{ "no-cd-media-valid", no_argument, NULL, 'M' },
+		{ "enable-cd-eject", no_argument, NULL, 'j' },
+		{ "no-enable-cd-eject", no_argument, NULL, 'J' },
+		{ "disable-cd-eject", no_argument, NULL, 'J' },
+		{ "invert-lcd", no_argument, NULL, 'i' },
+		{ "no-invert-lcd", no_argument, NULL, 'I' },
+		{ "power-led", required_argument, NULL, 'p' },
+		{ "lcd-backlight", required_argument, NULL, 'b' },
+		{ NULL, 0, 0, 0 }
+	};
+
+	memset(&cfg_mask, 0, sizeof(cfg_mask));
+	memset(&ops_mask, 0, sizeof(ops_mask));
+
+	optind = 1;
+	while ((opt = getopt_long(argc, argv, "aAb:cCheEiIjJlLmMp:qsStTvwW",
+					long_options, NULL)) != -1)
+	{
+		switch (opt) {
+		case 'a':
+			WDS_SET(cfg_mask.flags, WD_SECURITY_DISABLE_AP_BIT);
+			WDS_SET(cfg.flags, WD_SECURITY_DISABLE_AP_BIT);
+			break;
+		case 'A':
+			WDS_SET(cfg_mask.flags, WD_SECURITY_DISABLE_AP_BIT);
+			WDS_UNSET(cfg.flags, WD_SECURITY_DISABLE_AP_BIT);
+			break;
+		case 'b':
+			ops.backlight_brite = atoi(optarg);
+			ops_mask.backlight_brite = 255;
+			break;
+		case 'c':
+			WDS_SET(cfg_mask.flags, WD_SECURITY_DISABLE_CDROM_BIT);
+			WDS_SET(cfg.flags, WD_SECURITY_DISABLE_CDROM_BIT);
+			break;
+		case 'C':
+			WDS_SET(cfg_mask.flags, WD_SECURITY_DISABLE_CDROM_BIT);
+			WDS_UNSET(cfg.flags, WD_SECURITY_DISABLE_CDROM_BIT);
+			break;
+		case 'e':
+			WDS_SET(ops_mask.flags, WD_SECURITY_ESATA15_BIT);
+			WDS_SET(ops.flags, WD_SECURITY_ESATA15_BIT);
+			break;
+		case 'E':
+			WDS_SET(ops_mask.flags, WD_SECURITY_ESATA15_BIT);
+			WDS_UNSET(ops.flags, WD_SECURITY_ESATA15_BIT);
+			break;
+		case 'h':
+			config_cmd_help(argv[0]);
+			return 0;
+		case 'i':
+			WDS_SET(ops_mask.flags, WD_SECURITY_INVLCD_BIT);
+			WDS_SET(ops.flags, WD_SECURITY_INVLCD_BIT);
+			break;
+		case 'I':
+			WDS_SET(ops_mask.flags, WD_SECURITY_INVLCD_BIT);
+			WDS_UNSET(ops.flags, WD_SECURITY_INVLCD_BIT);
+			break;
+		case 'j':
+			WDS_SET(ops_mask.flags, WD_SECURITY_ENCDEJ_BIT);
+			WDS_SET(ops.flags, WD_SECURITY_ENCDEJ_BIT);
+			break;
+		case 'J':
+			WDS_SET(ops_mask.flags, WD_SECURITY_ENCDEJ_BIT);
+			WDS_UNSET(ops.flags, WD_SECURITY_ENCDEJ_BIT);
+			break;
+		case 'l':
+			WDS_SET(ops_mask.flags, WD_SECURITY_LOOSE_SB2_BIT);
+			WDS_SET(ops.flags, WD_SECURITY_LOOSE_SB2_BIT);
+			break;
+		case 'L':
+			WDS_SET(ops_mask.flags, WD_SECURITY_LOOSE_SB2_BIT);
+			WDS_UNSET(ops.flags, WD_SECURITY_LOOSE_SB2_BIT);
+			break;
+		case 'm':
+			WDS_SET(ops_mask.flags, WD_SECURITY_CDMVALID_BIT);
+			WDS_SET(ops.flags, WD_SECURITY_CDMVALID_BIT);
+			break;
+		case 'M':
+			WDS_SET(ops_mask.flags, WD_SECURITY_CDMVALID_BIT);
+			WDS_UNSET(ops.flags, WD_SECURITY_CDMVALID_BIT);
+			break;
+		case 'p':
+			ops.power_led_brite = (uint8_t)atoi(optarg);
+			ops_mask.power_led_brite = 255;
+			break;
+		case 'q':
+			quiet = 1;
+			break;
+		case 's':
+			WDS_SET(cfg_mask.flags, WD_SECURITY_DISABLE_SES_BIT);
+			WDS_SET(cfg.flags, WD_SECURITY_DISABLE_SES_BIT);
+			break;
+		case 'S':
+			WDS_SET(cfg_mask.flags, WD_SECURITY_DISABLE_SES_BIT);
+			WDS_UNSET(cfg.flags, WD_SECURITY_DISABLE_SES_BIT);
+			break;
+		case 't':
+			WDS_SET(cfg_mask.flags, WD_SECURITY_2TB_LIMIT_BIT);
+			WDS_SET(cfg.flags, WD_SECURITY_2TB_LIMIT_BIT);
+			break;
+		case 'T':
+			WDS_SET(cfg_mask.flags, WD_SECURITY_2TB_LIMIT_BIT);
+			WDS_UNSET(cfg.flags, WD_SECURITY_2TB_LIMIT_BIT);
+			break;
+		case 'w':
+			WDS_SET(cfg_mask.flags, WD_SECURITY_DISABLE_AP_BIT);
+			WDS_SET(cfg.flags, WD_SECURITY_DISABLE_AP_BIT);
+			break;
+		case 'W':
+			WDS_SET(cfg_mask.flags, WD_SECURITY_DISABLE_AP_BIT);
+			WDS_UNSET(cfg.flags, WD_SECURITY_DISABLE_AP_BIT);
+			break;
+		case 'v':
+			verbose++;
+			break;
+		case '?':
+			subcmd_usage(stderr, argv[0]);
+			return 1;
+		}
+	}
+
+	if (argc - optind != 1) {
+		subcmd_usage(stderr, argv[0]);
+		return 1;
+	}
+
+	devpath = argv[optind++];
+
+	wds = wds_open(devpath, NULL, &err);
+	if (!wds) {
+		fprintf(stderr, "Error: failed opening device: %s\n",
+				wds_strerror(err));
+		return 1;
+	}
+
+	if (cfg_mask.flags) {
+		if (!quiet) {
+			printf("Updating Device Configuration parameters...");
+			fflush(stdout);
+		}
+		err = wds_write_config_mode_page(wds, &cfg, &cfg_mask);
+		if (err)
+			fprintf(stderr, "Error: failed writing Device "
+					"Configuration parameters: %s\n",
+					wds_strerror(err));
+		else if (!quiet)
+			printf("done.\n");
+	}
+
+	if (ops_mask.flags || ops_mask.power_led_brite ||
+		ops_mask.backlight_brite)
+	{
+		if (!quiet) {
+			printf("Updating Device Operations parameters...");
+			fflush(stdout);
+		}
+		err = wds_write_operations_mode_page(wds, &ops, &ops_mask);
+		if (err)
+			fprintf(stderr, "Error: failed writing Device "
+				"Operations parameters: %s\n",
+				wds_strerror(err));
+		else if (!quiet)
+			printf("done.\n");
+	}
+
+	if (!quiet) {
+		err = wds_read_config_mode_page(wds, &cfg, &cfg_mask);
+		if (err)
+			fprintf(stderr, "Error: failed reading Device "
+					"Configuration parameters: %s\n",
+					wds_strerror(err));
+		else
+			printf("\n--- Device Configuration\n"
+			       "        %cDisable SES: %s\n"
+			       "      %cDisable CDROM: %s\n"
+			       "         %cDisable AP: %s\n"
+			       " %cDisable White List: %s\n"
+			       "          %c2TB Limit: %s\n",
+			       WDS_DISABLE_SES(cfg_mask.flags) ? '*' : ' ',
+			       WDS_DISABLE_SES(cfg.flags) ? "yes" : "no",
+			       WDS_DISABLE_CDROM(cfg_mask.flags) ? '*' : ' ',
+			       WDS_DISABLE_CDROM(cfg.flags) ? "yes" : "no",
+			       WDS_DISABLE_AP(cfg_mask.flags) ? '*' : ' ',
+			       WDS_DISABLE_AP(cfg.flags) ? "yes" : "no",
+			       WDS_DISABLE_WL(cfg_mask.flags) ? '*' : ' ',
+			       WDS_DISABLE_WL(cfg.flags) ? "yes" : "no",
+			       WDS_2TB_LIMIT(cfg_mask.flags) ? '*' : ' ',
+			       WDS_2TB_LIMIT(cfg.flags) ? "yes" : "no");
+
+		err2 = wds_read_operations_mode_page(wds, &ops, &ops_mask);
+		if (err2)
+			fprintf(stderr, "Error: failed reading Device "
+					"Operations parameters: %s\n",
+					wds_strerror(err2));
+		else
+			printf("\n--- Device Operations\n"
+			       "            %ceSATA15: %s\n"
+			       "          %cLoose SB2: %s\n"
+			       "    %cEnable CD Eject: %s\n"
+			       "     %cCD Media Valid: %s\n"
+			       "          %cPower LED: %" PRIu8 "\n"
+			       "      %cLCD Backlight: %" PRIu8 "\n"
+			       "         %cInvert LCD: %s\n",
+			       WDS_ESATA15(ops_mask.flags) ? '*' : ' ',
+			       WDS_ESATA15(ops.flags) ? "yes" : "no",
+			       WDS_LOOSE_SB2(ops_mask.flags) ? '*' : ' ',
+			       WDS_LOOSE_SB2(ops.flags) ? "yes" : "no",
+			       WDS_ENCDEJ(ops_mask.flags) ? '*' : ' ',
+			       WDS_ENCDEJ(ops.flags) ? "yes" : "no",
+			       WDS_CDMVALID(ops_mask.flags) ? '*' : ' ',
+			       WDS_CDMVALID(ops.flags) ? "yes" : "no",
+			       ops_mask.power_led_brite ? '*' : ' ',
+			       ops.power_led_brite,
+			       ops_mask.backlight_brite ? '*' : ' ',
+			       ops.backlight_brite,
+			       WDS_INVLCD(ops_mask.flags) ? '*' : ' ',
+			       WDS_INVLCD(ops.flags) ? "yes" : "no");
+	}
+
+	wds_close(wds);
+
+	return err ? err : err2;
+}
+
 static int unlock (wds_handle *wds, const uint8_t *salt, size_t salt_bytes,
 		const uint8_t* pw, size_t pw_bytes, unsigned long iterations)
 {
@@ -2169,6 +2462,7 @@ static const struct {
 	{ "change-pw", changepw_cmd, "change or set password" },
 	{ "erase", erase_cmd, "erase device" },
 	{ "handy-store", handy_store_cmd, "show/manipulate Handy Store" },
+	{ "config", config_cmd, "show/manipulate Device Config" },
 	{ "version", version, "version information" },
 	{ "help", help, "this text" }
 };

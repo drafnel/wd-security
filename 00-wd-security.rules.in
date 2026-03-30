@@ -32,6 +32,6 @@ GOTO="wd_security_end"
 LABEL="wd_security_unlock"
 PROGRAM=="/usr/bin/test -f '/etc/keys/$env{.WD_SECURITY_ID}.key'", \
 	PROGRAM=="@bindir@/wd-security status --is-locked /dev/%k", \
-	RUN+="@bindir@/wd-security unlock --rescan --key-file '/etc/keys/$env{.WD_SECURITY_ID}.key' /dev/%k"
+	PROGRAM=="@bindir@/wd-security unlock --rescan --key-file '/etc/keys/$env{.WD_SECURITY_ID}.key' /dev/%k"
 
 LABEL="wd_security_end"

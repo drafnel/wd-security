@@ -754,6 +754,56 @@ static int write_password_hint (wds_handle *wds, const char *hint_arg) {
 	return 0;
 }
 
+static int time_kek_generation (const uint8_t *salt, size_t salt_bytes,
+		const uint8_t *pw, size_t pw_bytes, unsigned long iterations,
+		struct timespec *elapsed)
+{
+	uint8_t kek[WD_SECURITY_KEK_MAX_BYTES];
+#ifdef _POSIX_MONOTONIC_CLOCK
+	clockid_t clockid = CLOCK_MONOTONIC;
+#else
+	clockid_t clockid = CLOCK_REALTIME;
+#endif
+	struct timespec ts_start;
+	struct timespec ts_end;
+	int err;
+
+	if (clock_gettime(clockid, &ts_start)) {
+		perror("clock_gettime failed");
+		return 1;
+	}
+
+	err = wds_generate_kek(salt, salt_bytes, pw, pw_bytes, iterations, kek);
+
+	if (clock_gettime(clockid, &ts_end)) {
+		perror("clock_gettime failed");
+		return 1;
+	}
+
+	if (err) {
+		fprintf(stderr, "Error: failed timing KEK generation: %s\n",
+				wds_strerror(err));
+		return 1;
+	}
+
+	elapsed->tv_sec = ts_end.tv_sec - ts_start.tv_sec;
+	if (ts_end.tv_nsec < ts_start.tv_nsec) {
+		elapsed->tv_sec--;
+		elapsed->tv_nsec = ts_end.tv_nsec +
+			(NSEC_PER_SEC - ts_start.tv_nsec);
+	} else {
+		/* add 1 nanosecond just to ensure it's never zero */
+		elapsed->tv_nsec = ts_end.tv_nsec - ts_start.tv_nsec + 1;
+	}
+
+	while (elapsed->tv_nsec >= NSEC_PER_SEC) {
+		elapsed->tv_sec++;
+		elapsed->tv_nsec -= NSEC_PER_SEC;
+	}
+
+	return 0;
+}
+
 /*
  * Generate a new Handy Store Security Block, allowing overrides for the
  * salt and iterations, but within the bounds to maintain compatibility
@@ -832,52 +882,15 @@ static int gen_security_block (struct wds_handy_store_security_block *sb,
 	}
 
 	if (!iterations) {
-		uint8_t kek[WD_SECURITY_KEK_MAX_BYTES];
-#ifdef _POSIX_MONOTONIC_CLOCK
-		clockid_t clockid = CLOCK_MONOTONIC;
-#else
-		clockid_t clockid = CLOCK_REALTIME;
-#endif
-		struct timespec ts_start;
-		struct timespec ts_end;
 		struct timespec elapsed;
 		int err;
 
 		iterations = 1000000;
 
-		if (clock_gettime(clockid, &ts_start)) {
-			perror("clock_gettime failed");
+		err = time_kek_generation(sb->salt, sizeof(sb->salt), NULL, 0,
+					  iterations, &elapsed);
+		if (err)
 			return 1;
-		}
-
-		err = wds_generate_kek(sb->salt, sizeof(sb->salt), NULL, 0,
-				iterations, kek);
-
-		if (clock_gettime(clockid, &ts_end)) {
-			perror("clock_gettime failed");
-			return 1;
-		}
-
-		if (err) {
-			fprintf(stderr, "Error: failed timing KEK generation: "
-					"%s\n", wds_strerror(err));
-			return 1;
-		}
-
-		elapsed.tv_sec = ts_end.tv_sec - ts_start.tv_sec;
-		if (ts_end.tv_nsec < ts_start.tv_nsec) {
-			elapsed.tv_sec--;
-			elapsed.tv_nsec = ts_end.tv_nsec +
-				(NSEC_PER_SEC - ts_start.tv_nsec);
-		} else {
-			/* add 1 nanosecond just to ensure it's never zero */
-			elapsed.tv_nsec = ts_end.tv_nsec - ts_start.tv_nsec + 1;
-		}
-
-		while (elapsed.tv_nsec >= NSEC_PER_SEC) {
-			elapsed.tv_sec++;
-			elapsed.tv_nsec -= NSEC_PER_SEC;
-		}
 
 		if (verbose)
 			fprintf(stderr, "Performed %lu hash iterations in %"

@@ -892,7 +892,7 @@ static int gen_security_block (struct wds_handy_store_security_block *sb,
 			iterations + 1.;
 
 		if (verbose)
-			fprintf(stderr, "Calculated iterations: %ld\n",
+			fprintf(stderr, "Calculated iterations: %lu\n",
 					iterations);
 
 		if (iterations < WD_SECURITY_DEFAULT_ITERATIONS)

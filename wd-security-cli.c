@@ -2262,7 +2262,7 @@ static int erase_drive (wds_handle *wds, uint8_t reset_syn[4],
 
 	err = wds_erase(wds, reset_syn, key, key_size, cipher, combine);
 	if (err)
-		fprintf(stderr, "Error: failed erasng device: %s\n",
+		fprintf(stderr, "Error: failed erasing device: %s\n",
 				wds_strerror(err));
 
 	free(key);

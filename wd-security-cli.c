@@ -1640,7 +1640,7 @@ static int unlock (wds_handle *wds, const uint8_t *salt, size_t salt_bytes,
 	}
 
 	if (es->kek_size > WD_SECURITY_KEK_MAX_BYTES) {
-		fprintf(stderr, "KEK size (%" PRIu16 ") is unsupported (max %u)",
+		fprintf(stderr, "KEK size (%" PRIu16 ") is unsupported (max %u)\n",
 				es->kek_size, WD_SECURITY_KEK_MAX_BYTES);
 		free(es);
 		return 1;

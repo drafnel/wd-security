@@ -44,7 +44,7 @@
 #include <sys/random.h>
 #endif
 
-#ifdef HAVE_DECL_BLKRRPART
+#if HAVE_DECL_BLKRRPART
 #include <fcntl.h>
 #include <sys/ioctl.h>
 #ifdef HAVE_LINUX_FS_H
@@ -126,7 +126,7 @@ static void hexdump (FILE *fp, const uint8_t *buf, size_t len) {
  */
 static int reread_part (const char *device) {
 	int err;
-#ifdef HAVE_DECL_BLKRRPART
+#if HAVE_DECL_BLKRRPART
 	int fd = open(device, O_RDWR | O_EXCL);
 	if (fd == -1) {
 		perror("reread-part failed opening device");

@@ -26,6 +26,9 @@ AS_VAR_SET_IF([ac_cv_path_A2X],
 			     [AC_SUBST([ADOC2MAN],
 				       ["\$(ASCIIDOCTOR) -b manpage"])])])
 AM_CONDITIONAL([FOUND_ADOC], AS_VAR_TEST_SET([ADOC2MAN]))
+AC_CHECK_PROG([HAVE_UDEV], [udevadm], [yes], [],
+	      [$PATH:$PATH_SEPARATOR/usr/sbin$PATH_SEPARATOR/sbin])
+AM_CONDITIONAL([FOUND_UDEV], AS_VAR_TEST_SET([ac_cv_prog_HAVE_UDEV]))
 
 dnl Prepare for future Autoconf macro to request 64-bit time_t??
 dnl See https://github.com/autotools-mirror/autoconf/blob/master/NEWS

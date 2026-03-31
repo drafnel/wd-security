@@ -10,7 +10,9 @@ CLEANFILES = VERSION.h 00-wd-security.rules \
 EXTRA_DIST = README.md INSTALL.md GEN-VERSION.sh 00-wd-security.rules.in \
              wd-security-devices.sh doc/wd-security.adoc.in debian
 udevrulesdir = $(prefix)/lib/udev/rules.d
+if FOUND_UDEV
 udevrules_DATA = 00-wd-security.rules
+endif
 doc_DATA = README.md COPYING wd-security-devices.sh wd-security.adoc
 if FOUND_ADOC
 man_MANS = wd-security.1

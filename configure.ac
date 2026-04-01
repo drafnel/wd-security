@@ -82,7 +82,7 @@ AC_CHECK_DECLS([BLKRRPART], [], [], [[
 # Checks for library functions.
 AC_FUNC_MALLOC
 AC_FUNC_REALLOC
-AC_CHECK_FUNCS([EVP_MD_fetch EVP_sha256 getrandom iconv memset strchr strrchr strtof strtoul])
+AC_CHECK_FUNCS([EVP_MD_fetch EVP_sha256 getrandom iconv memset strchr strrchr strtoul])
 
 
 AC_CONFIG_FILES([Makefile])

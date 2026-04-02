@@ -8,7 +8,8 @@ CLEANFILES = VERSION.h 00-wd-security.rules \
              wd-security_*.deb wd-security_*.dsc \
              wd-security_*.tar.xz wd-security-dbgsym_*.ddeb
 EXTRA_DIST = README.md INSTALL.md GEN-VERSION.sh 00-wd-security.rules.in \
-             wd-security-devices.sh doc/wd-security.adoc.in debian
+             wd-security-devices.sh doc/wd-security.adoc.in debian \
+             GEN-DEB-CHANGELOG.sh
 udevrulesdir = $(prefix)/lib/udev/rules.d
 if FOUND_UDEV
 udevrules_DATA = 00-wd-security.rules
@@ -37,15 +38,23 @@ dist-hook:
 	@version=`GIT_DIR='$(top_srcdir)/.git' GIT_WORK_TREE='$(top_srcdir)' $(SHELL) '$(top_srcdir)/GEN-VERSION.sh' -n` && \
 	rm -f '$(distdir)/GEN-VERSION.sh' && \
 	sed -e "s/^VERSION=.*/VERSION='$$version'/" '$(top_srcdir)/GEN-VERSION.sh' >'$(distdir)/GEN-VERSION.sh'
+	rm -f '$(distdir)/GEN-DEB-CHANGELOG.sh' && \
+	{ \
+	  echo '#!/bin/sh' && \
+	  echo 'cat <<"EOF"' && \
+	  GIT_DIR='$(top_srcdir)/.git' GIT_WORK_TREE='$(top_srcdir)' $(SHELL) $(top_srcdir)/GEN-DEB-CHANGELOG.sh 'v[0-9]*' '$(PACKAGE_TARNAME)' 'unstable' 'urgency=low' && \
+	  echo 'EOF'; \
+	} >'$(distdir)/GEN-DEB-CHANGELOG.sh'
+
+$(distdir)/debian/changelog: distdir
+	GIT_DIR='$(top_srcdir)/.git' GIT_WORK_TREE='$(top_srcdir)' $(SHELL) $(top_srcdir)/GEN-DEB-CHANGELOG.sh 'v[0-9]*' '$(PACKAGE_TARNAME)' 'unstable' 'urgency=low' >$@
 
 $(distdir)/debian/%: $(srcdir)/debian/%.in | distdir
 	sed -e 's|@PACKAGE_BUGREPORT[@]|$(PACKAGE_BUGREPORT)|g' \
 	    -e 's|@PACKAGE_NAME[@]|$(PACKAGE_NAME)|g' \
 	    -e 's|@PACKAGE_MAINTAINER[@]|$(PACKAGE_MAINTAINER)|g' \
 	    -e 's|@PACKAGE_TARNAME[@]|$(PACKAGE_TARNAME)|g' \
-	    -e 's|@PACKAGE_VERSION[@]|$(PACKAGE_VERSION)|g' \
 	    -e 's|@PACKAGE_URL[@]|$(PACKAGE_URL)|g' \
-	    -e "s|Thu, 01 Jan 1970 00:00:00 +0000|`date -R`|g" \
 	    $< >$@
 deb: distdir $(distdir)/debian/changelog $(distdir)/debian/control $(distdir)/debian/copyright
 	(cd $(distdir) && dpkg-buildpackage --no-sign)

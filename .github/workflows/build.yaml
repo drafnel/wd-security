@@ -29,7 +29,8 @@ jobs:
             - run: sudo apt-get install build-essential debhelper asciidoc-base -y
             - name: make deb
               run: |
-                export GIT_COMMITTER_NAME="github-$USER"
+                export GIT_COMMITTER_NAME="$GITHUB_ACTOR_ID+$GITHUB_ACTOR"
+                export GIT_COMMITTER_EMAIL="$GITHUB_ACTOR_ID+$GITHUB_ACTOR@users.noreply.github.com"
                 make deb
             - uses: actions/upload-artifact@v6
               with:

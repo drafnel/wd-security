@@ -46,7 +46,14 @@ gen_deb_changelog()
 	ver=`git describe --always --tags --match "$tag_pattern" --dirty 2>/dev/null` &&
 
 	# sha1 of most recent tag
-	sha=`git for-each-ref --count=1 --merged=HEAD --sort='-creatordate' --format='%(*objectname)' "refs/tags/$tag_pattern"` &&
+	# %(*objectname) cannot be used here since the tag may be a
+	# lightweight tag.
+	sha=`git for-each-ref --count=1 --merged=HEAD --sort='-creatordate' --format='%(objectname)' "refs/tags/$tag_pattern"` &&
+
+	# dereference tag sha1 into a commit object
+	# Note, $sha is allowed to be empty for the case where no tags
+	# have been created yet.
+	{ test -z "$sha" || sha=`git rev-parse --verify "$sha^0"`; } &&
 
 	# If working directory is dirty or HEAD is ahead of most recent
 	# tag, then emit an UNRELEASED changelog entry

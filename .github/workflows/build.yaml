@@ -25,8 +25,17 @@ jobs:
                 PATH="$(ruby -r rubygems -e 'puts Gem.user_dir')/bin:$PATH"
                 ./configure
                 make distcheck
+            - run: sudo apt-get update
+            - run: sudo apt-get install build-essential debhelper asciidoc-base -y
+            - name: make deb
+              run: |
+                export GIT_COMMITTER_NAME="github-$USER"
+                make deb
             - uses: actions/upload-artifact@v4
               with:
                   name: wd-security-${{ github.workflow }}.${{ github.run_number }}.${{ matrix.os }}
-                  path: wd-security-*.tar.gz
+                  path: |
+                      wd-security-*.tar.gz
+                      wd-security_*
+                      wd-security-dbgsym_*
                   compression-level: 0

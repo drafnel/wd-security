@@ -31,7 +31,7 @@ jobs:
               run: |
                 export GIT_COMMITTER_NAME="github-$USER"
                 make deb
-            - uses: actions/upload-artifact@v4
+            - uses: actions/upload-artifact@v6
               with:
                   name: wd-security-${{ github.workflow }}.${{ github.run_number }}.${{ matrix.os }}
                   path: |

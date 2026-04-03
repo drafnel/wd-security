@@ -3,6 +3,7 @@ run-name: Check compilation and source distribution
 on:
     push:
         branches: [ "master" ]
+        tags: "v[0-9]*"
     pull_request:
         branches: [ "master" ]
     workflow_dispatch:
@@ -40,3 +41,41 @@ jobs:
                       wd-security_*
                       wd-security-dbgsym_*
                   compression-level: 0
+    release:
+        if: github.ref_type == 'tag'
+        needs: make-distcheck
+        permissions:
+            contents: write
+        strategy:
+            fail-fast: false
+            matrix:
+                os: [ubuntu-latest, ubuntu-22.04, ubuntu-24.04-arm, ubuntu-22.04-arm]
+        runs-on: ${{ matrix.os }}
+        steps:
+            - run: sudo apt-get update
+            - run: sudo apt-get install build-essential debhelper asciidoc-base -y
+            - uses: actions/checkout@v5
+              with:
+                  fetch-depth: 0
+            - run: git show-ref
+            - run: autoreconf --verbose --force --install --symlink
+            - name: make deb
+              run: |
+                ./configure
+                test -e /etc/os-release && os_release='/etc/os-release' || os_release='/usr/lib/os-release'
+                osdist=$(. "$os_release" && echo "${ID:?}")
+                osver=$(. "$os_release" && echo "${VERSION_ID:?}")
+                export EXTRA_VERSION="+$osdist-$osver"
+                echo "EXTRA_VERSION: $EXTRA_VERSION"
+                export GIT_COMMITTER_NAME="$GITHUB_ACTOR_ID+$GITHUB_ACTOR"
+                export GIT_COMMITTER_EMAIL="$GITHUB_ACTOR_ID+$GITHUB_ACTOR@users.noreply.github.com"
+                make deb
+            - name: publish release
+              uses: softprops/action-gh-release@v2
+              with:
+                  name: WD Security for Linux ${{ github.ref_name }}
+                  files: |
+                      wd-security_*
+                      wd-security-dbgsym_*
+                  generate_release_notes: true
+                  fail_on_unmatched_files: true

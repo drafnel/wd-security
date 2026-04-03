@@ -18,6 +18,7 @@
 #
 # Copyright (C) 2026  Brandon Casey
 
+EXTRA_VERSION=${EXTRA_VERSION:-}
 
 # <tag-pattern> should be a glob(7) pattern that matches the portion of
 #               a tag after the "refs/tags/" prefix.
@@ -60,7 +61,7 @@ gen_deb_changelog()
 '
 		fi &&
 		cat <<-EOF
-		$package ($ver) UNRELEASED; $meta
+		$package ($ver$EXTRA_VERSION) UNRELEASED; $meta
 
 		  * Unreleased changes$extra
 		`git log -n "$limit" --no-merges --pretty='    %s' "$sha${sha:+..}HEAD"`
@@ -72,7 +73,7 @@ gen_deb_changelog()
 
 	# Iterate through each tag and emit a changelog entry
 	git for-each-ref --merged=HEAD --sort='-creatordate' --format="
-$package (XXltrim-alphaXX%(refname:short)) $distribution; $meta
+$package (XXltrim-alphaXX%(refname:short)$EXTRA_VERSION) $distribution; $meta
 
   * %(subject)
 

@@ -42,6 +42,8 @@ gen_deb_changelog()
 	local extra=
 	local trailer=
 
+	local strip_first_line='-e 1d'
+
 	# Version string describing HEAD
 	ver=`git describe --always --tags --match "$tag_pattern" --dirty 2>/dev/null` &&
 
@@ -60,6 +62,7 @@ gen_deb_changelog()
 	if [ "$ver" != "${ver%-dirty}" ] ||
 	   [ "$sha" != "$(git rev-parse HEAD^0)" ]
 	then
+		strip_first_line=
 		ver=`echo "x$ver" | sed -e 's/^[^0-9]\{0,\}//'` &&
 		count=`git rev-list --count --no-merges "$sha${sha:+..}HEAD"` &&
 		if [ "$count" -gt "$limit" ]; then
@@ -74,7 +77,6 @@ gen_deb_changelog()
 		`git log -n "$limit" --no-merges --pretty='    %s' "$sha${sha:+..}HEAD"`
 		$trailer
 		 -- `git var GIT_COMMITTER_IDENT | sed -e 's/[^>]*$//'`  `date -R`
-
 		EOF
 	fi &&
 
@@ -85,7 +87,7 @@ $package (XXltrim-alphaXX%(refname:short)$EXTRA_VERSION) $distribution; $meta
   * %(subject)
 
  -- %(creator)XXrtrim-unixXX  %(creatordate:rfc)" "refs/tags/$tag_pattern" |
-	sed -e '1d' \
+	sed $strip_first_line \
 	    -e 's/XXltrim-alphaXX[^0-9]\{0,\}//' \
 	    -e 's/ [0-9]\{1,\} [-+][0-9]\{4\}XXrtrim-unixXX//'
 }

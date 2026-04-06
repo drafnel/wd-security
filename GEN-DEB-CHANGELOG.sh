@@ -20,6 +20,10 @@
 
 EXTRA_VERSION=${EXTRA_VERSION:-}
 
+sane_date() {
+	LC_ALL=C date "$@"
+}
+
 # <tag-pattern> should be a glob(7) pattern that matches the portion of
 #               a tag after the "refs/tags/" prefix.
 gen_deb_changelog()
@@ -41,6 +45,8 @@ gen_deb_changelog()
 	local count
 	local extra=
 	local trailer=
+	local maintainer
+	local tz
 
 	local strip_first_line='-e 1d'
 
@@ -70,13 +76,16 @@ gen_deb_changelog()
 			trailer='    ...
 '
 		fi &&
+		maintainer=`git var GIT_COMMITTER_IDENT` &&
+		tz=${maintainer##* } &&
+		maintainer="${maintainer%>*}>" &&
 		cat <<-EOF
 		$package ($ver$EXTRA_VERSION) UNRELEASED; $meta
 
 		  * Unreleased changes$extra
 		`git log -n "$limit" --no-merges --pretty='    %s' "$sha${sha:+..}HEAD"`
 		$trailer
-		 -- `git var GIT_COMMITTER_IDENT | sed -e 's/[^>]*$//'`  `date -R`
+		 -- $maintainer  `sane_date -u +'%a, %d %b %Y %H:%M:%S'` $tz
 		EOF
 	fi &&
 

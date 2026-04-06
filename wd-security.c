@@ -1422,6 +1422,122 @@ static uint8_t checksum (const uint8_t *buf, unsigned len) {
 	return csum;
 }
 
+static int wds_encode_handy_store_security_block (
+		const struct wds_handy_store_security_block *hs,
+		void *buf, size_t len)
+{
+	struct wds_handy_store_security_block_packed *hsp;
+
+	assert(len == sizeof(*hsp));
+
+	hsp = (struct wds_handy_store_security_block_packed*)buf;
+
+	memset(hsp, 0, sizeof(*hsp));
+
+	if (hs) {
+		memcpy(hsp->sig, wd_security_handy_store_security_sig,
+			sizeof(hsp->sig));
+		hsp->iterations = htole32(hs->iterations);
+		memcpy(hsp->salt, hs->salt, sizeof(hsp->salt));
+		memcpy(hsp->hint, hs->hint, sizeof(hsp->hint));
+		hsp->checksum = ~checksum((uint8_t*)hsp, sizeof(*hsp)) + 1;
+
+		assert(checksum((uint8_t*)hsp, sizeof(*hsp)) == 0);
+	}
+
+	return 0;
+}
+
+static int wds_decode_handy_store_security_block (const void *buf, size_t len,
+		struct wds_handy_store_security_block *hs)
+{
+	const struct wds_handy_store_security_block_packed *hsp;
+
+	if (len != sizeof(*hsp)) {
+		mesg(ERROR, "unexpected Handy Store Security Block size, "
+			    "expected %zu, got %zu", sizeof(*hsp), len);
+		return WD_SECURITY_ESIZE;
+	}
+
+	hsp = (const struct wds_handy_store_security_block_packed*)buf;
+
+	if (memcmp(hsp->sig, wd_security_handy_store_security_sig,
+				sizeof(hsp->sig)))
+	{
+		mesg(ERROR, "Handy Store Security Block bad signature");
+		hexdump(DEBUG, "Expected: ",
+				wd_security_handy_store_security_sig,
+				sizeof(wd_security_handy_store_security_sig));
+		hexdump(DEBUG, "Got: ", hsp->sig, sizeof(hsp->sig));
+		return WD_SECURITY_ESIG;
+	}
+
+	if (checksum((uint8_t*)hsp, sizeof(*hsp))) {
+		mesg(ERROR, "Handy Store Security Block bad checksum");
+		return WD_SECURITY_ECHKSUM;
+	}
+
+	unpack_handy_store_security_block(hsp, hs);
+
+	return 0;
+}
+
+static int wds_encode_handy_store_user_block (
+		const struct wds_handy_store_user_block *hs,
+		void *buf, size_t len)
+{
+	struct wds_handy_store_user_block_packed *hsp;
+
+	assert(len == sizeof(*hsp));
+
+	hsp = (struct wds_handy_store_user_block_packed*)buf;
+
+	memset(hsp, 0, sizeof(*hsp));
+
+	if (hs) {
+		memcpy(hsp->sig, wd_security_handy_store_user_sig,
+				sizeof(hsp->sig));
+		memcpy(hsp->label, hs->label, sizeof(hsp->label));
+		hsp->checksum = ~checksum((uint8_t*)hsp, sizeof(*hsp)) + 1;
+
+		assert(checksum((uint8_t*)hsp, sizeof(*hsp)) == 0);
+	}
+
+	return 0;
+}
+
+static int wds_decode_handy_store_user_block (const void *buf, size_t len,
+		struct wds_handy_store_user_block *hs)
+{
+	const struct wds_handy_store_user_block_packed *hsp;
+
+	if (len != sizeof(*hsp)) {
+		mesg(ERROR, "unexpected Handy Store User Block size, "
+			    "expected %zu, got %zu", sizeof(*hsp), len);
+		return WD_SECURITY_ESIZE;
+	}
+
+	hsp = (const struct wds_handy_store_user_block_packed*)buf;
+
+	if (memcmp(hsp->sig, wd_security_handy_store_user_sig, sizeof(hsp->sig)))
+	{
+		mesg(ERROR, "Handy Store User Block bad signature");
+		hexdump(DEBUG, "Expected: ", wd_security_handy_store_user_sig,
+				sizeof(wd_security_handy_store_user_sig));
+		hexdump(DEBUG, "Got: ", hsp->sig, sizeof(hsp->sig));
+		return WD_SECURITY_ESIG;
+	}
+
+	if (checksum((uint8_t*)hsp, sizeof(*hsp))) {
+		mesg(ERROR, "Handy Store User Block bad checksum");
+		return WD_SECURITY_ECHKSUM;
+	}
+
+	unpack_handy_store_user_block(hsp, hs);
+
+	return 0;
+}
+
 static int decode_sense_data_handy_store (const struct sense_data_packed *sdp)
 {
 	if (SCSI_SB_ERROR_CODE(sdp->error_code_bits) ==
@@ -1471,19 +1587,11 @@ int wds_write_handy_store_security_block (struct wds_handle *wds,
 {
 	struct wds_handy_store_security_block_packed hsp;
 	size_t len = sizeof(hsp);
+	int err;
 
-	memset(&hsp, 0, sizeof(hsp));
-
-	if (hs) {
-		memcpy(hsp.sig, wd_security_handy_store_security_sig,
-				sizeof(hsp.sig));
-		hsp.iterations = htole32(hs->iterations);
-		memcpy(hsp.salt, hs->salt, sizeof(hsp.salt));
-		memcpy(hsp.hint, hs->hint, sizeof(hsp.hint));
-		hsp.checksum = ~checksum((uint8_t*)&hsp, sizeof(hsp)) + 1;
-
-		assert(checksum((uint8_t*)&hsp, sizeof(hsp)) == 0);
-	}
+	err = wds_encode_handy_store_security_block(hs, &hsp, len);
+	if (err)
+		return err;
 
 	/* clear security_block_loaded bit */
 	wds->security_block_loaded = 0;
@@ -1497,17 +1605,11 @@ int wds_write_handy_store_user_block (struct wds_handle *wds,
 {
 	struct wds_handy_store_user_block_packed hsp;
 	size_t len = sizeof(hsp);
+	int err;
 
-	memset(&hsp, 0, sizeof(hsp));
-
-	if (hs) {
-		memcpy(hsp.sig, wd_security_handy_store_user_sig,
-				sizeof(hsp.sig));
-		memcpy(hsp.label, hs->label, sizeof(hsp.label));
-		hsp.checksum = ~checksum((uint8_t*)&hsp, sizeof(hsp)) + 1;
-
-		assert(checksum((uint8_t*)&hsp, sizeof(hsp)) == 0);
-	}
+	err = wds_encode_handy_store_user_block(hs, &hsp, len);
+	if (err)
+		return err;
 
 	return wds_write_handy_store_blocks(wds,
 			WD_SECURITY_HANDY_STORE_USER_BLOCK, 1, &hsp, &len);
@@ -1555,29 +1657,9 @@ int wds_read_handy_store_security_block (
 	if (err)
 		return err;
 
-	if (len != sizeof(hsp)) {
-		mesg(ERROR, "unexpected Handy Store Security Block size, "
-			    "expected %zu, got %zu", sizeof(hsp), len);
-		return WD_SECURITY_ESIZE;
-	}
-
-	if (memcmp(hsp.sig, wd_security_handy_store_security_sig,
-				sizeof(hsp.sig)))
-	{
-		mesg(ERROR, "Handy Store Security Block bad signature");
-		hexdump(DEBUG, "Expected: ",
-				wd_security_handy_store_security_sig,
-				sizeof(wd_security_handy_store_security_sig));
-		hexdump(DEBUG, "Got: ", hsp.sig, sizeof(hsp.sig));
-		return WD_SECURITY_ESIG;
-	}
-
-	if (checksum((uint8_t*)&hsp, sizeof(hsp))) {
-		mesg(ERROR, "Handy Store Security Block bad checksum");
-		return WD_SECURITY_ECHKSUM;
-	}
-
-	unpack_handy_store_security_block(&hsp, hs);
+	err = wds_decode_handy_store_security_block(&hsp, len, hs);
+	if (err)
+		return err;
 
 	/* cache salt and iteration rounds  */
 	wds->iterations = hs->iterations;
@@ -1600,29 +1682,7 @@ int wds_read_handy_store_user_block (struct wds_handle *wds,
 	if (err)
 		return err;
 
-	if (len != sizeof(hsp)) {
-		mesg(ERROR, "unexpected Handy Store User Block size, "
-			    "expected %zu, got %zu", sizeof(hsp), len);
-		return WD_SECURITY_ESIZE;
-	}
-
-	if (memcmp(hsp.sig, wd_security_handy_store_user_sig, sizeof(hsp.sig)))
-	{
-		mesg(ERROR, "Handy Store User Block bad signature");
-		hexdump(DEBUG, "Expected: ", wd_security_handy_store_user_sig,
-				sizeof(wd_security_handy_store_user_sig));
-		hexdump(DEBUG, "Got: ", hsp.sig, sizeof(hsp.sig));
-		return WD_SECURITY_ESIG;
-	}
-
-	if (checksum((uint8_t*)&hsp, sizeof(hsp))) {
-		mesg(ERROR, "Handy Store User Block bad checksum");
-		return WD_SECURITY_ECHKSUM;
-	}
-
-	unpack_handy_store_user_block(&hsp, hs);
-
-	return 0;
+	return wds_decode_handy_store_user_block(&hsp, len, hs);
 }
 
 /*

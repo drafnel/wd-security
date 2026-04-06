@@ -63,7 +63,7 @@ gen_deb_changelog()
 	   [ "$sha" != "$(git rev-parse HEAD^0)" ]
 	then
 		strip_first_line=
-		ver=`echo "x$ver" | sed -e 's/^[^0-9]\{0,\}//'` &&
+		ver=`echo "x$ver" | sed -e 's/^[^0-9]*//'` &&
 		count=`git rev-list --count --no-merges "$sha${sha:+..}HEAD"` &&
 		if [ "$count" -gt "$limit" ]; then
 			extra=" ($count commits)"
@@ -88,7 +88,7 @@ $package (XXltrim-alphaXX%(refname:short)$EXTRA_VERSION) $distribution; $meta
 
  -- %(creator)XXrtrim-unixXX  %(creatordate:rfc)" "refs/tags/$tag_pattern" |
 	sed $strip_first_line \
-	    -e 's/XXltrim-alphaXX[^0-9]\{0,\}//' \
+	    -e 's/XXltrim-alphaXX[^0-9]*//' \
 	    -e 's/ [0-9]\{1,\} [-+][0-9]\{4\}XXrtrim-unixXX//'
 }
 

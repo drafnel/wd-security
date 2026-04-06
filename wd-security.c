@@ -19,7 +19,6 @@
  * with this program; if not, see <https://www.gnu.org/licenses/>.
  */
 #include "config.h"
-#include "compat.h"
 
 #include "wd-security.h"
 

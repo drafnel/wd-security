@@ -80,9 +80,11 @@
 #define WDPASSPORT_UTILS_PY_HINT "wdpassport-utils                                                                                                                                                                                          "
 #define WDPASSPORT_UTILS_PY_WARNING \
 	"Warning: enabling wdpassport-utils.py compatibility quirks.\n"
-#define NO_DETECT        0x00
-#define AUTO_DETECT      0x01
-#define FORCE_WDP_UTILS  0x02
+
+/* Handy Store flag bits */
+#define HS_WDP_AUTO    0x01
+#define HS_WDP_FORCE   0x02
+#define HS_WDP_MASK    0xff
 
 static char *progname;
 static int verbose;
@@ -937,20 +939,20 @@ static int gen_security_block (struct wds_handy_store_security_block *sb,
  * missing, then populate the returned wds_handy_store_security_block
  * with the default WD Security parameters.
  *
- * If detect_wdputils is non-zero, then detect whether the Security
+ * The flags parameter can control detection of whether the Security
  * Block was written by wdpassport-utils.py and munge the salt as
  * necessary.
  */
 static void read_security_block_nofail (wds_handle *wds,
 		struct wds_handy_store_security_block *sb,
-		int detect_wdputils)
+		unsigned flags)
 {
 	if (wds_read_handy_store_security_block(wds, sb)) {
 		memcpy(sb->salt, WD_SECURITY_DEFAULT_SALT, sizeof(sb->salt));
 		sb->iterations = WD_SECURITY_DEFAULT_ITERATIONS;
 		memset(sb->hint, 0, sizeof(sb->hint));
-	} else if (detect_wdputils == FORCE_WDP_UTILS ||
-		   (detect_wdputils == AUTO_DETECT &&
+	} else if (WDS_IS_SET(flags, HS_WDP_FORCE) ||
+		   (WDS_IS_SET(flags, HS_WDP_AUTO) &&
 		    is_wdpassport_utils(sb->hint))) {
 
 		fputs(WDPASSPORT_UTILS_PY_WARNING, stderr);
@@ -1140,7 +1142,7 @@ static int show_handy_capacity (FILE *fp, struct wds_handle *wds) {
 }
 
 static int show_handy_store_security_block (FILE *fp, struct wds_handle *wds,
-		int detect_wdputils)
+		unsigned flags)
 {
 	struct wds_handy_store_security_block sb;
 	int err;
@@ -1153,8 +1155,8 @@ static int show_handy_store_security_block (FILE *fp, struct wds_handle *wds,
 		fprintf(stderr, "Error: failed getting Handy Store Security "
 				"Block: %s\n", wds_strerror(err));
 		return 1;
-	} else if (detect_wdputils == FORCE_WDP_UTILS ||
-		   (detect_wdputils == AUTO_DETECT &&
+	} else if (WDS_IS_SET(flags, HS_WDP_FORCE) ||
+		   (WDS_IS_SET(flags, HS_WDP_AUTO) &&
 		    is_wdpassport_utils(sb.hint)))
 	{
 		size_t salt_len = sizeof(sb.salt);
@@ -1248,7 +1250,7 @@ static int handy_store_cmd (int argc, char * const argv[]) {
 	wds_handle *wds;
 	int err;
 	int opt;
-	int detect_wdputils = AUTO_DETECT;
+	unsigned hs_flags = HS_WDP_AUTO;
 	int show_capacity = 0;
 	const struct option long_options[] = {
 		{ "help", no_argument, NULL, 'h' },
@@ -1283,10 +1285,10 @@ static int handy_store_cmd (int argc, char * const argv[]) {
 			hint_arg = optarg;
 			break;
 		case 'N':
-			detect_wdputils = NO_DETECT;
+			WDS_UNSET(hs_flags, HS_WDP_MASK);
 			break;
 		case 'W':
-			detect_wdputils = FORCE_WDP_UTILS;
+			WDS_SET(hs_flags, HS_WDP_FORCE);
 			break;
 		case '?':
 			subcmd_usage(stderr, argv[0]);
@@ -1333,8 +1335,7 @@ static int handy_store_cmd (int argc, char * const argv[]) {
 				printf("done.\n");
 		}
 	} else {
-		err = show_handy_store_security_block(stdout, wds,
-				detect_wdputils);
+		err = show_handy_store_security_block(stdout, wds, hs_flags);
 		if (!err)
 			err = show_handy_store_user_block(stdout, wds);
 	}
@@ -1727,7 +1728,7 @@ static int unlock_cmd (int argc, char * const argv[]) {
 	int write_handy_store = 0;
 	int err;
 	int opt;
-	int detect_wdputils = AUTO_DETECT;
+	unsigned hs_flags = HS_WDP_AUTO;
 	const struct option long_options[] = {
 		{ "help", no_argument, NULL, 'h' },
 		{ "verbose", no_argument, NULL, 'v' },
@@ -1776,10 +1777,10 @@ static int unlock_cmd (int argc, char * const argv[]) {
 			write_handy_store = 1;
 			break;
 		case 'N':
-			detect_wdputils = NO_DETECT;
+			WDS_UNSET(hs_flags, HS_WDP_MASK);
 			break;
 		case 'W':
-			detect_wdputils = FORCE_WDP_UTILS;
+			WDS_SET(hs_flags, HS_WDP_FORCE);
 			break;
 		case '?':
 			subcmd_usage(stderr, argv[0]);
@@ -1804,7 +1805,7 @@ static int unlock_cmd (int argc, char * const argv[]) {
 	if (verbose)
 		fprintf(stderr, "Reading Handy Store Security Block...\n");
 
-	read_security_block_nofail(wds, &sb, detect_wdputils);
+	read_security_block_nofail(wds, &sb, hs_flags);
 
 	pw = get_password(&pw_bytes, key_file, pw_arg,
 			sb.hint, sizeof(sb.hint), 0, do_checks,
@@ -2008,7 +2009,7 @@ static int changepw_cmd (int argc, char * const argv[]) {
 	int do_checks = 1;
 	unsigned iter_time = DEFAULT_ITER_TIME;
 	uint16_t key_size;
-	int detect_wdputils = AUTO_DETECT;
+	unsigned hs_flags = HS_WDP_AUTO;
 	int hint_dirty = 0;
 	int err;
 	int opt;
@@ -2076,10 +2077,10 @@ static int changepw_cmd (int argc, char * const argv[]) {
 			iter_time = strtoul(optarg, NULL, 0);
 			break;
 		case 'N':
-			detect_wdputils = NO_DETECT;
+			WDS_UNSET(hs_flags, HS_WDP_MASK);
 			break;
 		case 'W':
-			detect_wdputils = FORCE_WDP_UTILS;
+			WDS_SET(hs_flags, HS_WDP_FORCE);
 			break;
 		case '?':
 			subcmd_usage(stderr, argv[0]);
@@ -2113,7 +2114,7 @@ static int changepw_cmd (int argc, char * const argv[]) {
 	if (verbose)
 		fprintf(stderr, "Reading Handy Store Security Block...\n");
 
-	read_security_block_nofail(wds, &sb, detect_wdputils);
+	read_security_block_nofail(wds, &sb, hs_flags);
 
 	if (es->status == WD_SECURITY_STATUS_UNLOCKED) {
 		opw = get_password(&opw_len, key_file, pw_arg,

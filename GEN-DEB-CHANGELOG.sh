@@ -85,7 +85,7 @@ gen_deb_changelog()
 		  * Unreleased changes$extra
 		`git log -n "$limit" --no-merges --pretty='    %s' "$sha${sha:+..}HEAD"`
 		$trailer
-		 -- $maintainer  `sane_date -u +'%a, %d %b %Y %H:%M:%S'` $tz
+		 -- $maintainer  `sane_date +'%a, %d %b %Y %H:%M:%S'` $tz
 		EOF
 	fi &&
 

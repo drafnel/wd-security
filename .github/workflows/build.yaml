@@ -24,6 +24,8 @@ jobs:
             - name: configure and make distcheck
               run: |
                 PATH="$(ruby -r rubygems -e 'puts Gem.user_dir')/bin:$PATH"
+                export GIT_COMMITTER_NAME="$GITHUB_ACTOR_ID+$GITHUB_ACTOR"
+                export GIT_COMMITTER_EMAIL="$GITHUB_ACTOR_ID+$GITHUB_ACTOR@users.noreply.github.com"
                 ./configure
                 make distcheck
             - run: sudo apt-get update

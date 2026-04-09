@@ -46,6 +46,7 @@ gen_deb_changelog()
 	local extra=
 	local trailer=
 	local maintainer
+	local rfc_date
 	local tz
 
 	local strip_first_line='-e 1d'
@@ -79,13 +80,14 @@ gen_deb_changelog()
 		maintainer=`git var GIT_COMMITTER_IDENT` &&
 		tz=${maintainer##* } &&
 		maintainer="${maintainer%>*}>" &&
+		rfcdate=`sane_date +'%a, %d %b %Y %H:%M:%S'` &&
 		cat <<-EOF
 		$package ($ver$EXTRA_VERSION) UNRELEASED; $meta
 
 		  * Unreleased changes$extra
 		`git log -n "$limit" --no-merges --pretty='    %s' "$sha${sha:+..}HEAD"`
 		$trailer
-		 -- $maintainer  `sane_date +'%a, %d %b %Y %H:%M:%S'` $tz
+		 -- $maintainer  $rfcdate $tz
 		EOF
 	fi &&
 

@@ -156,18 +156,24 @@ static int is_wdpassport_utils (const uint8_t *hint) {
  * buffer specified by *bufp and *maxlen will be updated to reflect the
  * number of bytes read.
  *
- * If *bufp is NULL, then a buffer large enough to hold the entire file
- * will be allocated and the file will be read into the allocated
- * buffer.  The allocated buffer will be passed back via *bufp and
- * *maxlen will be updated to reflect the size.
+ * If *bufp is NULL and *maxlen is non-zero, then a buffer of size
+ * *maxlen bytes will be allocated, and up to *maxlen bytes will be read
+ * into the allocated buffer.  The allocated buffer will be passed back
+ * via *bufp and *maxlen will be updated to reflect the number of bytes
+ * read.
+ *
+ * If *bufp is NULL and *maxlen is zero, then a buffer large enough to
+ * hold the entire file will be allocated and the file will be read into
+ * the allocated buffer.  The allocated buffer will be passed back via
+ * *bufp and *maxlen will be updated to reflect the size.
  *
  * Returns non-zero on error.
  */
 static int read_file (const char *filename, char **bufp, size_t *maxlen) {
 	FILE *fp;
 	char *buf = *bufp;
-	struct stat st;
 	size_t len;
+	size_t rd;
 
 	fp = fopen(filename, "r");
 	if (!fp) {
@@ -175,37 +181,36 @@ static int read_file (const char *filename, char **bufp, size_t *maxlen) {
 		return 1;
 	}
 
-	if (fstat(fileno(fp), &st)) {
-		perror("failed to stat file");
-		fclose(fp);
-		return 1;
-	}
-
 	len = *maxlen;
-	if (buf) {
-		if (len > (size_t)st.st_size)
-			len = st.st_size;
-	} else {
-		if (!len || len > (size_t)st.st_size)
-			len = st.st_size;
-		buf = xmalloc(len);
+
+	if (!len) {
+		struct stat st;
+		if (fstat(fileno(fp), &st)) {
+			perror("failed to stat file");
+			fclose(fp);
+			return 1;
+		}
+		len = st.st_size;
 	}
 
-	if (fread(buf, len, 1, fp) != 1) {
-		if (ferror(fp))
+	if (!buf)
+		buf = xmalloc(len);
+
+	rd = fread(buf, 1, len, fp);
+	if (!rd || rd != len) {
+		if (ferror(fp)) {
 			perror("failed reading from file");
-		else
-			fputs("short read from file\n", stderr);
-		if (!*bufp)
-			free(buf);
-		fclose(fp);
-		return 1;
+			if (!*bufp)
+				free(buf);
+			fclose(fp);
+			return 1;
+		}
 	}
 
 	if (fclose(fp))
 		perror("failed closing file");
 
-	*maxlen = len;
+	*maxlen = rd;
 	if (!*bufp)
 		*bufp = buf;
 

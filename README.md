@@ -66,7 +66,7 @@ If the device is currently protected with a password, then it may be
 changed, or removed.
 
 ```
-sudo wd-security change-pw [--disable-protection] /dev/sdX
+sudo wd-security change-pw [--disable] /dev/sdX
 ```
 
 where _sdX_ should be replaced by the name of the device file for your

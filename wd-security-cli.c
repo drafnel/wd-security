@@ -1946,7 +1946,7 @@ static void changepw_cmd_help (const char *name) {
 	       "software.\n"
 	       "\n"
 	       "OPTIONS\n"
-	       "--disable-protection   disable password protection\n"
+	       "--disable              disable password protection\n"
 	       "--no-clear             don't clear Handy Store Security Block\n"
 	       "                       when disabling password protection.\n"
 	       "--password <pw>        current password.  Will be converted to\n"
@@ -2015,7 +2015,7 @@ static int changepw_cmd (int argc, char * const argv[]) {
 	const struct option long_options[] = {
 		{ "help", no_argument, NULL, 'h' },
 		{ "verbose", no_argument, NULL, 'v' },
-		{ "disable-protection", no_argument, NULL, 'X' },
+		{ "disable", no_argument, NULL, 'X' },
 		{ "no-clear", no_argument, NULL, 'C' },
 		{ "password", required_argument, NULL, 'p' },
 		{ "new-password", required_argument, NULL, 'P' },

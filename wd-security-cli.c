@@ -86,6 +86,11 @@
 #define HS_WDP_FORCE   0x02
 #define HS_WDP_MASK    0xff
 
+#define LOG(_level, ...) do {                 \
+	if (verbose >= (_level))              \
+		fprintf(stderr, __VA_ARGS__); \
+} while(0)
+
 static char *progname;
 static int verbose;
 
@@ -900,21 +905,18 @@ static int gen_security_block (struct wds_handy_store_security_block *sb,
 		if (err)
 			return 1;
 
-		if (verbose)
-			fprintf(stderr, "Performed %lu hash iterations in %"
-					PRIdMAX ".%09" PRIdMAX " secs.\n",
-					iterations,
-					(intmax_t)elapsed.tv_sec,
-					(intmax_t)elapsed.tv_nsec);
+		LOG(1, "Performed %lu hash iterations in %" PRIdMAX ".%09" PRIdMAX
+		       " secs.\n",
+		       iterations,
+		       (intmax_t)elapsed.tv_sec,
+		       (intmax_t)elapsed.tv_nsec);
 
 		iterations = iter_time /
 			(elapsed.tv_sec * MSEC_PER_SEC +
 			 (double)elapsed.tv_nsec / NSEC_PER_MSEC) *
 			iterations + 1.;
 
-		if (verbose)
-			fprintf(stderr, "Calculated iterations: %lu\n",
-					iterations);
+		LOG(1, "Calculated iterations: %lu\n", iterations);
 
 		if (iterations < WD_SECURITY_DEFAULT_ITERATIONS)
 			iterations = WD_SECURITY_DEFAULT_ITERATIONS;
@@ -1802,8 +1804,7 @@ static int unlock_cmd (int argc, char * const argv[]) {
 		return 1;
 	}
 
-	if (verbose)
-		fprintf(stderr, "Reading Handy Store Security Block...\n");
+	LOG(1, "Reading Handy Store Security Block...\n");
 
 	read_security_block_nofail(wds, &sb, hs_flags);
 
@@ -1859,9 +1860,7 @@ static int unlock_cmd (int argc, char * const argv[]) {
 			if (is_wdpassport_utils(sb.hint))
 				memset(sb.hint, 0, sizeof(sb.hint));
 
-			if (verbose)
-				fprintf(stderr, "Writing new Handy Store "
-						"Security Block...\n");
+			LOG(1, "Writing new Handy Store Security Block...\n");
 
 			err = wds_write_handy_store_security_block(wds, &sb);
 			if (err) {
@@ -1879,9 +1878,7 @@ static int unlock_cmd (int argc, char * const argv[]) {
 	if (!err) {
 		printf("Successfully unlocked drive\n");
 		if (do_rescan) {
-			if (verbose)
-				fprintf(stderr, "Trying to reread partition "
-						"table...\n");
+			LOG(1, "Trying to reread partition table...\n");
 			err = reread_part(devpath);
 		}
 	}
@@ -2111,8 +2108,7 @@ static int changepw_cmd (int argc, char * const argv[]) {
 		return 1;
 	}
 
-	if (verbose)
-		fprintf(stderr, "Reading Handy Store Security Block...\n");
+	LOG(1, "Reading Handy Store Security Block...\n");
 
 	read_security_block_nofail(wds, &sb, hs_flags);
 
@@ -2193,9 +2189,7 @@ static int changepw_cmd (int argc, char * const argv[]) {
 		 *   Generate new security block.
 		 */
 
-		if (verbose)
-			fprintf(stderr, "Generating new Handy Store Security "
-					"Block...\n");
+		LOG(1, "Generating new Handy Store Security Block...\n");
 
 		if (gen_security_block(&sb, salt_file, salt_arg, iterations,
 				hint_arg, iter_time))
@@ -2209,9 +2203,7 @@ static int changepw_cmd (int argc, char * const argv[]) {
 			return 1;
 		}
 
-		if (verbose)
-			fprintf(stderr, "Writing new Handy Store Security "
-					"Block...\n");
+		LOG(1, "Writing new Handy Store Security Block...\n");
 
 		err = wds_write_handy_store_security_block(wds, &sb);
 		if (err) {
@@ -2279,9 +2271,7 @@ static int changepw_cmd (int argc, char * const argv[]) {
 		 *   Clear Security Block
 		 */
 		if (clear_sec_block) {
-			if (verbose)
-				fprintf(stderr, "Clearing Handy Store Security "
-						"Block...\n");
+			LOG(1, "Clearing Handy Store Security Block...\n");
 			err = wds_write_handy_store_security_block(wds, NULL);
 			if (err)
 				fprintf(stderr, "Error: failed clearing Handy "
@@ -2298,9 +2288,7 @@ static int changepw_cmd (int argc, char * const argv[]) {
 		 * the Security Block (i.e. *not* overriden by salt or
 		 * iterations specified on the command line) and the new hint.
 		 */
-		if (verbose)
-			fprintf(stderr, "Updating Handy Store Security "
-					"Block...\n");
+		LOG(1, "Updating Handy Store Security Block...\n");
 		err = wds_write_handy_store_security_block(wds, &sb);
 		if (err)
 			fprintf(stderr, "Error: failed writing hint to Handy "

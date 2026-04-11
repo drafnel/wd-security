@@ -14,7 +14,7 @@ AC_CONFIG_AUX_DIR([build-aux])
 AM_INIT_AUTOMAKE([foreign])
 
 # GCC 64-bit
-AS_VAR_SET_IF([CFLAGS], [], [AS_VAR_SET([CFLAGS], ["-W -Wall -O2"])])
+AS_VAR_SET_IF([CFLAGS], [], [AS_VAR_SET([CFLAGS], ["-g -W -Wall -O2"])])
 
 # Checks for programs.
 AC_PROG_CC

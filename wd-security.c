@@ -755,7 +755,7 @@ struct wds_handle* wds_open (const char *device, const struct wds_opts *opts,
 			wds_log_level(level);
 	}
 
-	fd = open(device, O_RDONLY);
+	fd = open(device, O_RDONLY | O_CLOEXEC);
 	if (fd < 0) {
 		mesg_errno(ERROR, "failed opening WD Security device \"%s\"",
 				device);

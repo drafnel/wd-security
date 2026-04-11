@@ -856,8 +856,9 @@ static int gen_security_block (struct wds_handy_store_security_block *sb,
 	}
 
 	if (salt_file) {
+		uint8_t *salt = sb->salt;
 		size_t len = sizeof(sb->salt);
-		if (read_file(salt_file, (char**)&sb->salt, &len)) {
+		if (read_file(salt_file, (char**)&salt, &len)) {
 			fprintf(stderr, "Error: failed reading salt from "
 					"file \"%s\"\n", salt_file);
 			return 1;

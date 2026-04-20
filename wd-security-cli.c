@@ -1019,18 +1019,23 @@ static void subcmd_usage (FILE *fp, const char *name) {
 			progname, name);
 }
 
-static void status_cmd_help (const char *name) {
+static void subcmd_help (const char *brief, const char *opts, const char *name)
+{
 	subcmd_usage(stdout, name);
 	printf("\n"
-	       "Show encryption status of <device>\n"
+	       "%s\n"
 	       "\n"
 	       "OPTIONS\n"
-	       "--is-locked  suppress normal output and exit with zero status\n"
-	       "             if locked, non-zero otherwise.\n"
-	       "--verbose    increase verbosity\n"
-	       "--help       this text\n"
-	       "\n");
+	       "%s"
+	       "\n", brief, opts);
 }
+
+#define STATUS_CMD_HELP_BRIEF "Show encryption status of <device>"
+#define STATUS_CMD_HELP_OPTS                                              \
+	"--is-locked  suppress normal output and exit with zero status\n" \
+	"             if locked, non-zero otherwise.\n"                   \
+	"--verbose    increase verbosity\n"                               \
+	"--help       this text\n"
 
 static int status_cmd (int argc, char * const argv[]) {
 	const char *devpath;
@@ -1051,7 +1056,8 @@ static int status_cmd (int argc, char * const argv[]) {
 	{
 		switch (opt) {
 		case 'h':
-			status_cmd_help(argv[0]);
+			subcmd_help(STATUS_CMD_HELP_BRIEF,
+				STATUS_CMD_HELP_OPTS, argv[0]);
 			return 0;
 		case 'v':
 			verbose++;
@@ -1218,34 +1224,30 @@ static int show_handy_store_user_block (FILE *fp, struct wds_handle *wds) {
 	return 0;
 }
 
-static void handy_store_cmd_help (const char *name) {
-	subcmd_usage(stdout, name);
-	printf("\n"
-	       "Show or manipulate the Handy Store of <device>\n"
-	       "\n"
-	       "The proprietary WD Security software stores encryption parameters\n"
-	       "in special sectors on the drive called the Handy Store.  The\n"
-	       "first two blocks are named the Security Block and the User Block.\n"
-	       "\n"
-	       "Security Block\n"
-	       "--------------\n"
-	       "Stores the password hint, as well as the salt and number of\n"
-	       "iteration rounds used to generate the Key Encryption Key (KEK).\n"
-	       "\n"
-	       "User Block\n"
-	       "----------\n"
-	       "Stores a drive label.\n"
-	       "\n"
-	       "OPTIONS\n"
-	       "--capacity         show capacity\n"
-	       "--set-label        set the drive label\n"
-	       "--set-hint         set the password hint\n"
-	       "--no-wdp-utils     don't detect wdpassport-utils.py\n"
-	       "--wdp-utils        force wdpassport-utils.py quirks\n"
-	       "--verbose          increase verbosity\n"
-	       "--help             this text\n"
-	       "\n");
-}
+#define HANDY_STORE_HELP_BRIEF                                                \
+	"Show or manipulate the Handy Store of <device>\n"                    \
+	"\n"                                                                  \
+	"The proprietary WD Security software stores encryption parameters\n" \
+	"in special sectors on the drive called the Handy Store.  The\n"      \
+	"first two blocks are named the Security Block and the User Block.\n" \
+	"\n"                                                                  \
+	"Security Block\n"                                                    \
+	"--------------\n"                                                    \
+	"Stores the password hint, as well as the salt and number of\n"       \
+	"iteration rounds used to generate the Key Encryption Key (KEK).\n"   \
+	"\n"                                                                  \
+	"User Block\n"                                                        \
+	"----------\n"                                                        \
+	"Stores a drive label."
+
+#define HANDY_STORE_HELP_OPTS                                   \
+	"--capacity         show capacity\n"                    \
+	"--set-label        set the drive label\n"              \
+	"--set-hint         set the password hint\n"            \
+	"--no-wdp-utils     don't detect wdpassport-utils.py\n" \
+	"--wdp-utils        force wdpassport-utils.py quirks\n" \
+	"--verbose          increase verbosity\n"               \
+	"--help             this text\n"
 
 static int handy_store_cmd (int argc, char * const argv[]) {
 	const char *devpath;
@@ -1272,7 +1274,8 @@ static int handy_store_cmd (int argc, char * const argv[]) {
 	{
 		switch (opt) {
 		case 'h':
-			handy_store_cmd_help(argv[0]);
+			subcmd_help(HANDY_STORE_HELP_BRIEF,
+				HANDY_STORE_HELP_OPTS, argv[0]);
 			return 0;
 		case 'v':
 			verbose++;
@@ -1347,39 +1350,35 @@ static int handy_store_cmd (int argc, char * const argv[]) {
 	return err;
 }
 
-static void config_cmd_help (const char *name) {
-	subcmd_usage(stdout, name);
-	printf("\n"
-	       "Show or manipulate configuration parameters of <device>\n"
-	       "\n"
-	       "Displays a table of device configuration parameters.  Those\n"
-	       "prefixed with '*' may be modified.\n"
-	       "\n"
-	       "Each boolean switch described below has a '--no-' prefixed\n"
-	       "counterpart to reverse the behavior, e.g. '--no-disable-ap'.\n"
-	       "\n"
-	       "(?) - the meaning of the parameter is unknown\n"
-	       "\n"
-	       "OPTIONS\n"
-	       "--disable-ap           disable AP (?)\n"
-	       "--disable-cdrom        disable emulated CDROM device\n"
-	       "--disable-ses          disable SCSI Enclosure Services\n"
-	       "--disable-wl           disable white list (?)\n"
-	       "--2tb-limit            limit reported capacity to 2TB\n"
-	       "\n"
-	       "--cd-media-valid       set CD media valid (?)\n"
-	       "--enable-cd-eject      enable CD eject (?)\n"
-	       "--esata15              force 150MBps transfer speed (?)\n"
-	       "--invert-lcd           invert LCD display\n"
-	       "--lcd-backlight <num>  set brightness of LCD backlight (0-255)\n"
-	       "--loose-sb2            Fibre Channel \"loose\" SB-2 (?)\n"
-	       "--power-led <num>      set brightness of power LED (0-255)\n"
-	       "--quiet                do not display table of current\n"
-	       "                       configuration parameters\n"
-	       "--verbose              increase verbosity\n"
-	       "--help                 this text\n"
-	       "\n");
-}
+#define CONFIG_HELP_BRIEF                                                \
+	"Show or manipulate configuration parameters of <device>\n"      \
+	"\n"                                                             \
+	"Displays a table of device configuration parameters.  Those\n"  \
+	"prefixed with '*' may be modified.\n"                           \
+	"\n"                                                             \
+	"Each boolean switch described below has a '--no-' prefixed\n"   \
+	"counterpart to reverse the behavior, e.g. '--no-disable-ap'.\n" \
+	"\n"                                                             \
+	"(?) - the meaning of the parameter is unknown"
+
+#define CONFIG_HELP_OPTS                                                   \
+	"--disable-ap           disable AP (?)\n"                          \
+	"--disable-cdrom        disable emulated CDROM device\n"           \
+	"--disable-ses          disable SCSI Enclosure Services\n"         \
+	"--disable-wl           disable white list (?)\n"                  \
+	"--2tb-limit            limit reported capacity to 2TB\n"          \
+	"\n"                                                               \
+	"--cd-media-valid       set CD media valid (?)\n"                  \
+	"--enable-cd-eject      enable CD eject (?)\n"                     \
+	"--esata15              force 150MBps transfer speed (?)\n"        \
+	"--invert-lcd           invert LCD display\n"                      \
+	"--lcd-backlight <num>  set brightness of LCD backlight (0-255)\n" \
+	"--loose-sb2            Fibre Channel \"loose\" SB-2 (?)\n"        \
+	"--power-led <num>      set brightness of power LED (0-255)\n"     \
+	"--quiet                do not display table of current\n"         \
+	"                       configuration parameters\n"                \
+	"--verbose              increase verbosity\n"                      \
+	"--help                 this text\n"
 
 static int config_cmd (int argc, char * const argv[]) {
 	const char *devpath;
@@ -1463,7 +1462,8 @@ static int config_cmd (int argc, char * const argv[]) {
 			WDS_UNSET(ops.flags, WD_SECURITY_ESATA15_BIT);
 			break;
 		case 'h':
-			config_cmd_help(argv[0]);
+			subcmd_help(CONFIG_HELP_BRIEF, CONFIG_HELP_OPTS,
+				argv[0]);
 			return 0;
 		case 'i':
 			WDS_SET(ops_mask.flags, WD_SECURITY_INVLCD_BIT);
@@ -1682,35 +1682,31 @@ static int unlock (wds_handle *wds, const uint8_t *salt, size_t salt_bytes,
 	return 0;
 }
 
-static void unlock_cmd_help (const char *name) {
-	subcmd_usage(stdout, name);
-	printf("\n"
-	       "Prompt for password and unlock <device>.  The password will be\n"
-	       "converted to UTF-16LE encoding to be compatible with the\n"
-	       "proprietary WD Security software.\n"
-	       "\n"
-	       "OPTIONS\n"
-	       "--password <pw>      unlock password.  Will be converted to\n"
-	       "                     UTF-16LE.\n"
-	       "--key-file <file>    use contents of file as password.  The\n"
-	       "                     entire file will be read and used as-is\n"
-	       "                     for the password.\n"
-	       "--salt <salt>        password salt.  Will be converted to\n"
-	       "                     UTF-16LE.  Overrides Handy Store.\n"
-	       "--salt-file <file>   use contents of file as password salt.\n"
-	       "                     The entire file will be read and used\n"
-	       "                     as-is for the password salt.  Overrides\n"
-	       "                     Handy Store.\n"
-	       "--iterations <num>   number of hash iterations to perform.\n"
-	       "                     Overrides Handy Store.\n"
-	       "--write-handy-store  write salt/iterations to Handy Store\n"
-	       "--rescan             reread partition table after unlock\n"
-	       "--no-wdp-utils       don't detect wdpassport-utils.py\n"
-	       "--wdp-utils          force wdpassport-utils.py quirks\n"
-	       "--verbose            increase verbosity\n"
-	       "--help               this text\n"
-	       "\n");
-}
+#define UNLOCK_HELP_BRIEF                                                  \
+	"Prompt for password and unlock <device>.  The password will be\n" \
+	"converted to UTF-16LE encoding to be compatible with the\n"       \
+	"proprietary WD Security software."
+
+#define UNLOCK_HELP_OPTS                                                 \
+	"--password <pw>      unlock password.  Will be converted to\n"  \
+	"                     UTF-16LE.\n"                               \
+	"--key-file <file>    use contents of file as password.  The\n"  \
+	"                     entire file will be read and used as-is\n" \
+	"                     for the password.\n"                       \
+	"--salt <salt>        password salt.  Will be converted to\n"    \
+	"                     UTF-16LE.  Overrides Handy Store.\n"       \
+	"--salt-file <file>   use contents of file as password salt.\n"  \
+	"                     The entire file will be read and used\n"   \
+	"                     as-is for the password salt.  Overrides\n" \
+	"                     Handy Store.\n"                            \
+	"--iterations <num>   number of hash iterations to perform.\n"   \
+	"                     Overrides Handy Store.\n"                  \
+	"--write-handy-store  write salt/iterations to Handy Store\n"    \
+	"--rescan             reread partition table after unlock\n"     \
+	"--no-wdp-utils       don't detect wdpassport-utils.py\n"        \
+	"--wdp-utils          force wdpassport-utils.py quirks\n"        \
+	"--verbose            increase verbosity\n"                      \
+	"--help               this text\n"
 
 static int unlock_cmd (int argc, char * const argv[]) {
 	struct wds_handy_store_security_block sb;
@@ -1752,7 +1748,8 @@ static int unlock_cmd (int argc, char * const argv[]) {
 	{
 		switch (opt) {
 		case 'h':
-			unlock_cmd_help(argv[0]);
+			subcmd_help(UNLOCK_HELP_BRIEF, UNLOCK_HELP_OPTS,
+				argv[0]);
 			return 0;
 		case 'v':
 			verbose++;
@@ -1935,52 +1932,48 @@ static int changepw (wds_handle *wds, const uint8_t *salt, size_t salt_bytes,
 	return 0;
 }
 
-static void changepw_cmd_help (const char *name) {
-	subcmd_usage(stdout, name);
-	printf("\n"
-	       "Prompt for password(s) and enable/disable/change encryption\n"
-	       "status of <device>.  The password(s) will be converted to\n"
-	       "UTF16-LE to be compatible with the proprietary WD Security\n"
-	       "software.\n"
-	       "\n"
-	       "OPTIONS\n"
-	       "--disable              disable password protection\n"
-	       "--no-clear             don't clear Handy Store Security Block\n"
-	       "                       when disabling password protection.\n"
-	       "--password <pw>        current password.  Will be converted to\n"
-	       "                       UTF-16LE.\n"
-	       "--key-file <file>      use contents of file as password.  The\n"
-	       "                       entire file will be read and used as-is\n"
-	       "                       for the password.\n"
-	       "--new-password <pw>    new password.  Will be converted to\n"
-	       "                       UTF-16LE.\n"
-	       "--new-key-file <file>  use contents of file as new password.\n"
-	       "                       The entire file will be read and used\n"
-	       "                       as-is for the password.\n"
-	       "--hint <hint>          set new password hint\n"
-	       "--salt <salt>          password salt.  Will be converted to\n"
-	       "                       UTF-16LE.  If enabling password protection\n"
-	       "                       then will be truncated or zero-padded\n"
-	       "                       to 8-bytes after converting to UTF-16LE\n"
-	       "                       if necessary.  Otherwise full value\n"
-	       "                       overrides Handy Store.\n"
-	       "--salt-file <file>     use contents of file as password salt.\n"
-	       "                       If enabling password protection, then\n"
-	       "                       8-bytes will be read, zero-padding if\n"
-	       "                       necessary.  Otherwise the entire file\n"
-	       "                       will be read and used as-is for the\n"
-	       "                       password salt.  Overrides Handy Store.\n"
-	       "--iterations <num>     number of hash iterations to perform.\n"
-	       "                       Clamped to 32-bits if enabling password\n"
-	       "                       protection.  Overrides Handy Store.\n"
-	       "--iter-time <ms>       milliseconds for hash iteration rounds\n"
-	       "                       (default: " str(DEFAULT_ITER_TIME) ")\n"
-	       "--no-wdp-utils         don't detect wdpassport-utils.py\n"
-	       "--wdp-utils            force wdpassport-utils.py quirks\n"
-	       "--verbose              increase verbosity\n"
-	       "--help                 this text\n"
-	       "\n");
-}
+#define CHANGEPW_HELP_BRIEF                                             \
+	"Prompt for password(s) and enable/disable/change encryption\n" \
+	"status of <device>.  The password(s) will be converted to\n"   \
+	"UTF16-LE to be compatible with the proprietary WD Security\n"  \
+	"software."
+
+#define CHANGEPW_HELP_OPTS                                                    \
+	"--disable              disable password protection\n"                \
+	"--no-clear             don't clear Handy Store Security Block\n"     \
+	"                       when disabling password protection.\n"        \
+	"--password <pw>        current password.  Will be converted to\n"    \
+	"                       UTF-16LE.\n"                                  \
+	"--key-file <file>      use contents of file as password.  The\n"     \
+	"                       entire file will be read and used as-is\n"    \
+	"                       for the password.\n"                          \
+	"--new-password <pw>    new password.  Will be converted to\n"        \
+	"                       UTF-16LE.\n"                                  \
+	"--new-key-file <file>  use contents of file as new password.\n"      \
+	"                       The entire file will be read and used\n"      \
+	"                       as-is for the password.\n"                    \
+	"--hint <hint>          set new password hint\n"                      \
+	"--salt <salt>          password salt.  Will be converted to\n"       \
+	"                       UTF-16LE.  If enabling password protection\n" \
+	"                       then will be truncated or zero-padded\n"      \
+	"                       to 8-bytes after converting to UTF-16LE\n"    \
+	"                       if necessary.  Otherwise full value\n"        \
+	"                       overrides Handy Store.\n"                     \
+	"--salt-file <file>     use contents of file as password salt.\n"     \
+	"                       If enabling password protection, then\n"      \
+	"                       8-bytes will be read, zero-padding if\n"      \
+	"                       necessary.  Otherwise the entire file\n"      \
+	"                       will be read and used as-is for the\n"        \
+	"                       password salt.  Overrides Handy Store.\n"     \
+	"--iterations <num>     number of hash iterations to perform.\n"      \
+	"                       Clamped to 32-bits if enabling password\n"    \
+	"                       protection.  Overrides Handy Store.\n"        \
+	"--iter-time <ms>       milliseconds for hash iteration rounds\n"     \
+	"                       (default: " str(DEFAULT_ITER_TIME) ")\n"      \
+	"--no-wdp-utils         don't detect wdpassport-utils.py\n"           \
+	"--wdp-utils            force wdpassport-utils.py quirks\n"           \
+	"--verbose              increase verbosity\n"                         \
+	"--help                 this text\n"
 
 static int changepw_cmd (int argc, char * const argv[]) {
 	const char *devpath;
@@ -2035,7 +2028,8 @@ static int changepw_cmd (int argc, char * const argv[]) {
 	{
 		switch (opt) {
 		case 'h':
-			changepw_cmd_help(argv[0]);
+			subcmd_help(CHANGEPW_HELP_BRIEF, CHANGEPW_HELP_OPTS,
+				argv[0]);
 			return 0;
 		case 'v':
 			verbose++;
@@ -2345,27 +2339,23 @@ static int erase_drive (wds_handle *wds, uint8_t reset_syn[4],
 	return err;
 }
 
-static void erase_cmd_help (const char *name) {
-	subcmd_usage(stdout, name);
-	printf("\n"
-	       "Erase <device> by changing Device Encryption Key (DEK)\n"
-	       "\n"
-	       "CAUTION: all information that exists on device will become\n"
-	       "         lost and completely unrecoverable.\n"
-	       "\n"
-	       "OPTIONS\n"
-	       "--no-clear         don't clear Handy Store Security Block\n"
-	       "--cipher <name>    specify cipher by name\n"
-	       "--cipher-id <id>   specify cipher by id\n"
-	       "--combine          request mixing key with on-device RNG\n"
-	       "--key-file <file>  use contents of file as encryption key.\n"
-	       "                   <key-size> bytes will be read from file and\n"
-	       "                   used as-is for the encryption key.\n"
-	       "--key-size <num>   force encryption key size (bytes)\n"
-	       "--verbose          increase verbosity\n"
-	       "--help             this text\n"
-	       "\n");
-}
+#define ERASE_HELP_BRIEF                                               \
+	"Erase <device> by changing Device Encryption Key (DEK)\n"     \
+	"\n"                                                           \
+	"CAUTION: all information that exists on device will become\n" \
+	"         lost and completely unrecoverable."
+
+#define ERASE_HELP_OPTS                                                    \
+	"--no-clear         don't clear Handy Store Security Block\n"      \
+	"--cipher <name>    specify cipher by name\n"                      \
+	"--cipher-id <id>   specify cipher by id\n"                        \
+	"--combine          request mixing key with on-device RNG\n"       \
+	"--key-file <file>  use contents of file as encryption key.\n"     \
+	"                   <key-size> bytes will be read from file and\n" \
+	"                   used as-is for the encryption key.\n"          \
+	"--key-size <num>   force encryption key size (bytes)\n"           \
+	"--verbose          increase verbosity\n"                          \
+	"--help             this text\n"
 
 static int erase_cmd(int argc, char * const argv[]) {
 	const char *devpath;
@@ -2397,7 +2387,7 @@ static int erase_cmd(int argc, char * const argv[]) {
 		switch (opt) {
 			unsigned long ul_tmp;
 		case 'h':
-			erase_cmd_help(argv[0]);
+			subcmd_help(ERASE_HELP_BRIEF, ERASE_HELP_OPTS, argv[0]);
 			return 0;
 		case 'v':
 			verbose++;

@@ -2562,7 +2562,7 @@ static int help (int argc, char * const argv[]) {
 	       "Manage password protection of external drives supported by\n"
 	       "the proprietary WD Security software.\n"
 	       "\n"
-	       "Sub-commands:\n");
+	       "SUB-COMMANDS:\n");
 	for (i = 0; i < ARRAY_LEN(subcmd); i++) {
 		int width = (int)strlen(subcmd[i].name);
 		if (width > width_max)

@@ -223,41 +223,9 @@ unrecoverable.
       Force encryption key size to be _bytes_ bytes.  Overrides the
       value reported by the device.
 
-*handy-store* [_OPTIONS_] _device_::
+*handy-store* [_OPTIONS_] *info*|*set*|*show* ...::
 
-Show or manipulate the Handy Store of _device_.
-+
-The proprietary WD Security software stores encryption parameters in
-special sectors on the drive called the Handy Store.  The first two
-blocks are named the Security Block and the User Block.
-
-  Security Block:::
-
-    Stores the password hint, as well as the salt and number of
-    iteration rounds to use to generate the Key Encryption Key (KEK).
-
-  User Block:::
-
-    Stores a drive label.
-
-  OPTIONS:::
-
-    *--capacity*::::
-      Show capacity of Handy Store.
-
-    *--set-label* _label_::::
-      Set the drive label to _label_.
-
-    *--set-hint* _hint_::::
-      Set the password hint to _hint_.
-
-    *--no-wdp-utils*::::
-      Don't try to detect whether wdpassport-utils.py was used to
-      generate the Handy Store Security Block or enable compatibility
-      quirks.
-
-    *--wdp-utils*::::
-      Force-enable compatibility quirks for wdpassport-utils.py.
+Show or manipulate the Handy Store.  See <<_handy_store>>.
 
 *config* [_OPTIONS_] _device_::
 
@@ -335,6 +303,62 @@ and, if the device allows, modified.
     *--quiet*::::
       Be quiet and do not display the table of current configuration
       parameters.
+
+== Handy Store
+
+The proprietary WD Security software stores encryption parameters in
+special sectors on the drive called the Handy Store.  The two known
+blocks are named the Security Block and the User Block.
+
+=== Security Block
+
+Stores the password hint, as well as the salt and number of iteration
+rounds to use to generate the Key Encryption Key (KEK).
+
+=== User Block
+
+Stores a drive label.
+
+=== Sub-Commands
+
+*handy-store* *info* [_OPTIONS_] _device_::
+
+Show geometry of Handy Store.
+
+  Last Block:::
+    Address of last block.
+
+  Block Size:::
+    Size (bytes) of each block.
+
+  Xfer Max:::
+    Maximum number of blocks that may be transferred at a time.
+
+*handy-store* *set* [_OPTIONS_] _device_ _name_=_value_ [_name_=_value_ ...]::
+
+For each _name_/_value_ pair, set field _name_ to _value_ in Handy Store.
+
+  Configurable Fields:::
+
+    *hint* _hint_::::
+        Set the password hint to _hint_.
+
+    *label* _label_::::
+        Set the drive label to _label_.
+
+*handy-store* *show* [_OPTIONS_] _device_::
+
+Display Security and User blocks of Handy Store.
+
+  OPTIONS:::
+
+    *--no-wdp-utils*::::
+      Don't try to detect whether wdpassport-utils.py was used to
+      generate the Handy Store Security Block or enable compatibility
+      quirks.
+
+    *--wdp-utils*::::
+      Force-enable compatibility quirks for wdpassport-utils.py.
 
 == Automatic Unlocking
 
@@ -465,7 +489,7 @@ Successfully unlocked drive
 .Set the password hint of /dev/sdb
 ====
 ----
-# wd-security handy-store --set-hint 'My password hint' /dev/sdb
+# wd-security handy-store set /dev/sdb hint='My password hint'
 Writing password hint to Handy Store Security Block...done.
 ----
 ====
@@ -473,7 +497,7 @@ Writing password hint to Handy Store Security Block...done.
 .Set the drive label of /dev/sdb
 ====
 ----
-# wd-security handy-store --set-label "My Book 25EE (6TB)" /dev/sdb
+# wd-security handy-store set /dev/sdb label="My Book 25EE (6TB)"
 Writing drive label to Handy Store Security Block...done.
 ----
 ====
@@ -481,7 +505,7 @@ Writing drive label to Handy Store Security Block...done.
 .Show contents of the Handy Store of /dev/sdb
 ====
 ----
-# wd-security handy-store /dev/sdb
+# wd-security handy-store show /dev/sdb
  Password Salt: "钋ꪂ㵏좪" 0x8b 0x94 0x82 0xaa 0x4f 0x3d 0xaa 0xc8
  Password Hint: "My password hint"
 Iteration Rnds: 8635497

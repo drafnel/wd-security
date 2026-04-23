@@ -1038,15 +1038,42 @@ static int get_iterations_salt (
 
 	return 0;
 }
+static void vsubcmd_usage_pre (FILE *fp, va_list ap) {
+	const char *name;
 
-static void subcmd_usage (FILE *fp, const char *name) {
-	fprintf(fp, "usage: %s %s [--help] [OPTIONS] <device>\n",
-			progname, name);
+	fprintf(fp, "usage: %s ", progname);
+
+	name = va_arg(ap, char*);
+	while (name) {
+		fprintf(fp, "%s ", name);
+		name = va_arg(ap, char*);
+	}
 }
 
-static void subcmd_help (const char *brief, const char *opts, const char *name)
+static void vsubcmd_usage (FILE *fp, va_list ap) {
+	vsubcmd_usage_pre(fp, ap);
+	fputs("[--help] [OPTIONS] <device>\n", fp);
+}
+
+static void subcmd_usage (FILE *fp, ...) {
+	va_list ap;
+	va_start(ap, fp);
+	vsubcmd_usage(fp, ap);
+	va_end(ap);
+}
+
+static void subcmd_help (void (*usage_func) (FILE *fp, va_list ap),
+		const char *brief, const char *opts, ...)
 {
-	subcmd_usage(stdout, name);
+	va_list ap;
+
+	if (!usage_func)
+		usage_func = vsubcmd_usage;
+
+	va_start(ap, opts);
+	usage_func(stdout, ap);
+	va_end(ap);
+
 	printf("\n"
 	       "%s\n"
 	       "\n"
@@ -1081,8 +1108,8 @@ static int status_cmd (int argc, char * const argv[]) {
 	{
 		switch (opt) {
 		case 'h':
-			subcmd_help(STATUS_CMD_HELP_BRIEF,
-				STATUS_CMD_HELP_OPTS, argv[0]);
+			subcmd_help(NULL, STATUS_CMD_HELP_BRIEF,
+				STATUS_CMD_HELP_OPTS, argv[0], NULL);
 			return 0;
 		case 'v':
 			verbose++;
@@ -1249,85 +1276,46 @@ static int show_handy_store_user_block (FILE *fp, struct wds_handle *wds) {
 	return 0;
 }
 
-#define HANDY_STORE_HELP_BRIEF                                                \
-	"Show or manipulate the Handy Store of <device>\n"                    \
-	"\n"                                                                  \
-	"The proprietary WD Security software stores encryption parameters\n" \
-	"in special sectors on the drive called the Handy Store.  The\n"      \
-	"first two blocks are named the Security Block and the User Block.\n" \
-	"\n"                                                                  \
-	"Security Block\n"                                                    \
-	"--------------\n"                                                    \
-	"Stores the password hint, as well as the salt and number of\n"       \
-	"iteration rounds used to generate the Key Encryption Key (KEK).\n"   \
-	"\n"                                                                  \
-	"User Block\n"                                                        \
-	"----------\n"                                                        \
-	"Stores a drive label."
+#define HANDY_STORE_CAPACITY_HELP_BRIEF \
+	"Show geometry of Handy Store."
 
-#define HANDY_STORE_HELP_OPTS                                   \
-	"--capacity         show capacity\n"                    \
-	"--set-label        set the drive label\n"              \
-	"--set-hint         set the password hint\n"            \
-	"--no-wdp-utils     don't detect wdpassport-utils.py\n" \
-	"--wdp-utils        force wdpassport-utils.py quirks\n" \
-	"--verbose          increase verbosity\n"               \
+#define HANDY_STORE_CAPACITY_HELP_OPTS    \
+	"--verbose          increase verbosity\n" \
 	"--help             this text\n"
 
-static int handy_store_cmd (int argc, char * const argv[]) {
+static int handy_store_capacity_cmd (const char * const super, int argc,
+		char * const argv[])
+{
 	const char *devpath;
 	wds_handle *wds;
 	int err;
 	int opt;
-	unsigned hs_flags = HS_WDP_AUTO;
-	int show_capacity = 0;
 	const struct option long_options[] = {
 		{ "help", no_argument, NULL, 'h' },
 		{ "verbose", no_argument, NULL, 'v' },
-		{ "capacity", no_argument, NULL, 'C' },
-		{ "set-label", required_argument, NULL, 'L' },
-		{ "set-hint", required_argument, NULL, 'H' },
-		{ "no-wdp-utils", no_argument, NULL, 'N' },
-		{ "wdp-utils", no_argument, NULL, 'W' },
 		{ NULL, 0, 0, 0 }
 	};
-	const char *label_arg = NULL;
-	const char *hint_arg = NULL;
 
 	optind = 1;
-	while ((opt = getopt_long(argc, argv, "hvCNWL:H:", long_options, NULL)) != -1)
+	while ((opt = getopt_long(argc, argv, "hv", long_options, NULL)) != -1)
 	{
 		switch (opt) {
 		case 'h':
-			subcmd_help(HANDY_STORE_HELP_BRIEF,
-				HANDY_STORE_HELP_OPTS, argv[0]);
+			subcmd_help(NULL, HANDY_STORE_CAPACITY_HELP_BRIEF,
+				HANDY_STORE_CAPACITY_HELP_OPTS, super, argv[0],
+				NULL);
 			return 0;
 		case 'v':
 			verbose++;
 			break;
-		case 'C':
-			show_capacity = 1;
-			break;
-		case 'L':
-			label_arg = optarg;
-			break;
-		case 'H':
-			hint_arg = optarg;
-			break;
-		case 'N':
-			WDS_UNSET(hs_flags, HS_WDP_MASK);
-			break;
-		case 'W':
-			WDS_SET(hs_flags, HS_WDP_FORCE);
-			break;
 		case '?':
-			subcmd_usage(stderr, argv[0]);
+			subcmd_usage(stderr, super, argv[0], NULL);
 			return 1;
 		}
 	}
 
 	if (argc - optind != 1) {
-		subcmd_usage(stderr, argv[0]);
+		subcmd_usage(stderr, super, argv[0], NULL);
 		return 1;
 	}
 
@@ -1340,39 +1328,320 @@ static int handy_store_cmd (int argc, char * const argv[]) {
 		return 1;
 	}
 
-	if (show_capacity) {
-		err = show_handy_capacity(stdout, wds);
-	} else if (hint_arg || label_arg) {
-		if (hint_arg) {
-			printf("Writing password hint to Handy Store Security "
-			       "Block...");
-			fflush(stdout);
-			if (write_password_hint(wds, hint_arg)) {
-				fprintf(stderr, "FAILED\n");
-				err = 1;
-			} else
-				printf("done.\n");
-		}
+	err = show_handy_capacity(stdout, wds);
 
-		if (label_arg) {
-			printf("Writing drive label to Handy Store User "
-			       "Block...");
-			fflush(stdout);
-			if (write_drive_label(wds, label_arg)) {
-				fprintf(stderr, "FAILED\n");
-				err = 1;
-			} else
-				printf("done.\n");
+	wds_close(wds);
+
+	return err;
+}
+
+#define HANDY_STORE_SHOW_HELP_BRIEF                      \
+	"Display Security and User blocks of Handy Store."
+
+#define HANDY_STORE_SHOW_HELP_OPTS                              \
+	"--no-wdp-utils     don't detect wdpassport-utils.py\n" \
+	"--wdp-utils        force wdpassport-utils.py quirks\n" \
+	"--verbose          increase verbosity\n"               \
+	"--help             this text\n"
+
+static int handy_store_show_cmd (const char *super, int argc,
+		char * const argv[])
+{
+	const char *devpath;
+	wds_handle *wds;
+	int err;
+	int opt;
+	unsigned hs_flags = HS_WDP_AUTO;
+	const struct option long_options[] = {
+		{ "help", no_argument, NULL, 'h' },
+		{ "verbose", no_argument, NULL, 'v' },
+		{ "no-wdp-utils", no_argument, NULL, 'N' },
+		{ "wdp-utils", no_argument, NULL, 'W' },
+		{ NULL, 0, 0, 0 }
+	};
+
+	optind = 1;
+	while ((opt = getopt_long(argc, argv, "hvNW", long_options, NULL)) != -1)
+	{
+		switch (opt) {
+		case 'h':
+			subcmd_help(NULL, HANDY_STORE_SHOW_HELP_BRIEF,
+				HANDY_STORE_SHOW_HELP_OPTS, super, argv[0],
+				NULL);
+			return 0;
+		case 'v':
+			verbose++;
+			break;
+		case 'N':
+			WDS_UNSET(hs_flags, HS_WDP_MASK);
+			break;
+		case 'W':
+			WDS_SET(hs_flags, HS_WDP_FORCE);
+			break;
+		case '?':
+			subcmd_usage(stderr, super, argv[0], NULL);
+			return 1;
 		}
-	} else {
-		err = show_handy_store_security_block(stdout, wds, hs_flags);
-		if (!err)
-			err = show_handy_store_user_block(stdout, wds);
+	}
+
+	if (argc - optind != 1) {
+		subcmd_usage(stderr, super, argv[0], NULL);
+		return 1;
+	}
+
+	devpath = argv[optind++];
+
+	wds = wds_open(devpath, NULL, &err);
+	if (!wds) {
+		fprintf(stderr, "Error: failed opening device: %s\n",
+				wds_strerror(err));
+		return 1;
+	}
+
+	err = show_handy_store_security_block(stdout, wds, hs_flags);
+	if (!err)
+		err = show_handy_store_user_block(stdout, wds);
+
+	wds_close(wds);
+
+	return err;
+}
+
+static int has_prefix (const char *s, const char *prefix) {
+	return !strncmp(prefix, s, strlen(prefix));
+}
+
+static void vhandy_store_set_cmd_usage (FILE *fp, va_list ap) {
+	vsubcmd_usage_pre(fp, ap);
+	fputs("[--help] [OPTIONS] <device> <name>=<value> [<name>=<value> ...]\n", fp);
+}
+
+static void handy_store_set_cmd_usage (FILE *fp, ...)
+{
+	va_list ap;
+	va_start(ap, fp);
+	vhandy_store_set_cmd_usage(fp, ap);
+	va_end(ap);
+}
+
+#define HANDY_STORE_SET_HELP_BRIEF                \
+	"Set <name> to <value> in Handy Store.\n" \
+	"\n"                                      \
+	"Configurable fields:\n"                  \
+	"\n"                                      \
+	"    hint - Password hint\n"              \
+	"   label - Drive Label"
+
+#define HANDY_STORE_SET_HELP_OPTS                 \
+	"--verbose          increase verbosity\n" \
+	"--help             this text\n"
+
+static int handy_store_set_cmd (const char *super, int argc,
+		char * const argv[])
+{
+	const char *devpath;
+	wds_handle *wds;
+	int err;
+	int opt;
+	const struct option long_options[] = {
+		{ "help", no_argument, NULL, 'h' },
+		{ "verbose", no_argument, NULL, 'v' },
+		{ NULL, 0, 0, 0 }
+	};
+	const char *label_arg = NULL;
+	const char *hint_arg = NULL;
+
+	optind = 1;
+	while ((opt = getopt_long(argc, argv, "hv", long_options, NULL)) != -1)
+	{
+		switch (opt) {
+		case 'h':
+			subcmd_help(vhandy_store_set_cmd_usage,
+				HANDY_STORE_SET_HELP_BRIEF,
+				HANDY_STORE_SET_HELP_OPTS, super, argv[0],
+				NULL);
+			return 0;
+		case 'v':
+			verbose++;
+			break;
+		case '?':
+			handy_store_set_cmd_usage(stderr, super, argv[0], NULL);
+			return 1;
+		}
+	}
+
+	if (argc - optind < 2) {
+		handy_store_set_cmd_usage(stderr, super, argv[0], NULL);
+		return 1;
+	}
+
+	devpath = argv[optind++];
+
+	for ( ; optind < argc; optind++) {
+		if (has_prefix(argv[optind], "hint="))
+			hint_arg = argv[optind] + strlen("hint=");
+		else if (has_prefix(argv[optind], "label="))
+			label_arg = argv[optind] + strlen("label=");
+		else {
+			fprintf(stderr, "Error: unrecognized field \"%s\"\n",
+					argv[optind]);
+			break;
+		}
+	}
+
+	if (argc - optind != 0) {
+		handy_store_set_cmd_usage(stderr, super, argv[0], NULL);
+		return 1;
+	}
+
+	wds = wds_open(devpath, NULL, &err);
+	if (!wds) {
+		fprintf(stderr, "Error: failed opening device: %s\n",
+				wds_strerror(err));
+		return 1;
+	}
+
+	if (hint_arg) {
+		printf("Writing password hint to Handy Store Security Block...");
+		fflush(stdout);
+		if (write_password_hint(wds, hint_arg)) {
+			fprintf(stderr, "FAILED\n");
+			err = 1;
+		} else
+			printf("done.\n");
+	}
+
+	if (label_arg) {
+		printf("Writing drive label to Handy Store User Block...");
+		fflush(stdout);
+		if (write_drive_label(wds, label_arg)) {
+			fprintf(stderr, "FAILED\n");
+			err = 1;
+		} else
+			printf("done.\n");
 	}
 
 	wds_close(wds);
 
 	return err;
+}
+
+static int handy_store_cmd_help (const char *, int argc, char * const argv[]);
+
+static const struct {
+	const char *name;
+	int (*func) (const char*, int, char * const *);
+	const char *desc;
+} hs_subcmd[] = {
+	{ "info", handy_store_capacity_cmd, "show geometry" },
+	{ "set", handy_store_set_cmd, "set configurable fields" },
+	{ "show", handy_store_show_cmd, "display known blocks" },
+	{ "help", handy_store_cmd_help, "this text" },
+};
+
+static void handy_store_cmd_usage (FILE *fp, const char *super) {
+	size_t i;
+
+	fprintf(fp, "usage: %s %s [--help] %s", progname, super,
+			hs_subcmd[0].name);
+	for (i = 1; i < ARRAY_LEN(hs_subcmd) - 1; i++)
+		fprintf(fp, "|%s", hs_subcmd[i].name);
+	fputs(" ...\n", fp);
+}
+
+#define HANDY_STORE_HELP_BRIEF                                                \
+	"Show or manipulate the Handy Store.\n"                               \
+	"\n"                                                                  \
+	"The proprietary WD Security software stores encryption parameters\n" \
+	"in special sectors on the drive called the Handy Store.  The two\n"  \
+	"known blocks are named the Security Block and the User Block.\n"     \
+	"\n"                                                                  \
+	"Security Block\n"                                                    \
+	"--------------\n"                                                    \
+	"Stores the password hint, as well as the salt and number of\n"       \
+	"iteration rounds used to generate the Key Encryption Key (KEK).\n"   \
+	"\n"                                                                  \
+	"User Block\n"                                                        \
+	"----------\n"                                                        \
+	"Stores a drive label."
+
+static int handy_store_cmd_help (const char *super, int argc,
+		char * const argv[])
+{
+	int width_max = 0;
+	size_t i;
+
+	if (argc > 1) {
+		for (i = 0; i < ARRAY_LEN(hs_subcmd); i++)
+			if (!strcmp(argv[1], hs_subcmd[i].name)) {
+				char * const tmpargv[] = {
+					argv[1],
+					"--help",
+					NULL
+				};
+				return hs_subcmd[i].func(super, 2, tmpargv);
+			}
+	}
+
+	handy_store_cmd_usage(stdout, super);
+	puts("\n"
+	     HANDY_STORE_HELP_BRIEF
+	     "\n\nSUB-COMMANDS:");
+	for (i = 0; i < ARRAY_LEN(hs_subcmd); i++) {
+		int width = (int)strlen(hs_subcmd[i].name);
+		if (width > width_max)
+			width_max = width;
+	}
+	for (i = 0; i < ARRAY_LEN(hs_subcmd); i++)
+		printf(" %*s  %s\n", -width_max, hs_subcmd[i].name,
+				hs_subcmd[i].desc);
+	putchar('\n');
+
+	return 0;
+}
+
+static int handy_store_cmd (int argc, char * const argv[]) {
+	const char* cmd;
+	size_t i;
+	int opt;
+	const struct option long_options[] = {
+		{ "help", no_argument, NULL, 'h' },
+		{ "verbose", no_argument, NULL, 'v' },
+		{ NULL, 0, 0, 0 }
+	};
+
+	optind = 0;
+	while ((opt = getopt_long(argc, argv, "+hv", long_options, NULL)) != -1)
+	{
+		switch (opt) {
+		case 'h':
+			return handy_store_cmd_help(argv[0], argc - optind + 1,
+					argv + optind - 1);
+		case 'v':
+			verbose++;
+			break;
+		case '?':
+			handy_store_cmd_usage(stderr, argv[0]);
+			return 1;
+		}
+	}
+
+	if (argc - optind < 1) {
+		handy_store_cmd_usage(stderr, argv[0]);
+		return 1;
+	}
+
+	cmd = argv[optind];
+
+	for (i = 0; i < ARRAY_LEN(hs_subcmd); i++)
+		if (!strcmp(cmd, hs_subcmd[i].name))
+			return hs_subcmd[i].func(argv[0], argc - optind,
+					argv + optind);
+
+	handy_store_cmd_usage(stderr, argv[0]);
+	fprintf(stderr, "Error: unknown sub-command \"%s\"\n", cmd);
+
+	return 1;
 }
 
 #define CONFIG_HELP_BRIEF                                                \
@@ -1495,8 +1764,8 @@ static int config_cmd (int argc, char * const argv[]) {
 			WDS_UNSET(ops.flags, WD_SECURITY_ESATA15_BIT);
 			break;
 		case 'h':
-			subcmd_help(CONFIG_HELP_BRIEF, CONFIG_HELP_OPTS,
-				argv[0]);
+			subcmd_help(NULL, CONFIG_HELP_BRIEF, CONFIG_HELP_OPTS,
+				argv[0], NULL);
 			return 0;
 		case 'i':
 			WDS_SET(ops_mask.flags, WD_SECURITY_INVLCD_BIT);
@@ -1572,13 +1841,13 @@ static int config_cmd (int argc, char * const argv[]) {
 			verbose++;
 			break;
 		case '?':
-			subcmd_usage(stderr, argv[0]);
+			subcmd_usage(stderr, argv[0], NULL);
 			return 1;
 		}
 	}
 
 	if (argc - optind != 1) {
-		subcmd_usage(stderr, argv[0]);
+		subcmd_usage(stderr, argv[0], NULL);
 		return 1;
 	}
 
@@ -1788,8 +2057,8 @@ static int unlock_cmd (int argc, char * const argv[]) {
 	{
 		switch (opt) {
 		case 'h':
-			subcmd_help(UNLOCK_HELP_BRIEF, UNLOCK_HELP_OPTS,
-				argv[0]);
+			subcmd_help(NULL, UNLOCK_HELP_BRIEF, UNLOCK_HELP_OPTS,
+				argv[0], NULL);
 			return 0;
 		case 'v':
 			verbose++;
@@ -1822,13 +2091,13 @@ static int unlock_cmd (int argc, char * const argv[]) {
 			WDS_SET(hs_flags, HS_WDP_FORCE);
 			break;
 		case '?':
-			subcmd_usage(stderr, argv[0]);
+			subcmd_usage(stderr, argv[0], NULL);
 			return 1;
 		}
 	}
 
 	if (argc - optind != 1) {
-		subcmd_usage(stderr, argv[0]);
+		subcmd_usage(stderr, argv[0], NULL);
 		return 1;
 	}
 
@@ -2068,8 +2337,8 @@ static int changepw_cmd (int argc, char * const argv[]) {
 	{
 		switch (opt) {
 		case 'h':
-			subcmd_help(CHANGEPW_HELP_BRIEF, CHANGEPW_HELP_OPTS,
-				argv[0]);
+			subcmd_help(NULL, CHANGEPW_HELP_BRIEF,
+				CHANGEPW_HELP_OPTS, argv[0], NULL);
 			return 0;
 		case 'v':
 			verbose++;
@@ -2114,13 +2383,13 @@ static int changepw_cmd (int argc, char * const argv[]) {
 			WDS_SET(hs_flags, HS_WDP_FORCE);
 			break;
 		case '?':
-			subcmd_usage(stderr, argv[0]);
+			subcmd_usage(stderr, argv[0], NULL);
 			return 1;
 		}
 	}
 
 	if (argc - optind != 1) {
-		subcmd_usage(stderr, argv[0]);
+		subcmd_usage(stderr, argv[0], NULL);
 		return 1;
 	}
 
@@ -2427,7 +2696,8 @@ static int erase_cmd(int argc, char * const argv[]) {
 		switch (opt) {
 			unsigned long ul_tmp;
 		case 'h':
-			subcmd_help(ERASE_HELP_BRIEF, ERASE_HELP_OPTS, argv[0]);
+			subcmd_help(NULL, ERASE_HELP_BRIEF, ERASE_HELP_OPTS,
+				argv[0], NULL);
 			return 0;
 		case 'v':
 			verbose++;
@@ -2438,7 +2708,7 @@ static int erase_cmd(int argc, char * const argv[]) {
 		case 'I':
 			ul_tmp = strtoul_or_die(optarg, 0);
 			if (ul_tmp > UINT8_MAX) {
-				subcmd_usage(stderr, argv[0]);
+				subcmd_usage(stderr, argv[0], NULL);
 				fputs("Error: cipher-id out-of-range\n", stderr);
 				return 1;
 			}
@@ -2453,7 +2723,7 @@ static int erase_cmd(int argc, char * const argv[]) {
 		case 'l':
 			ul_tmp = strtoul_or_die(optarg, 0);
 			if (ul_tmp > UINT16_MAX) {
-				subcmd_usage(stderr, argv[0]);
+				subcmd_usage(stderr, argv[0], NULL);
 				fputs("Error: key-size out-of-range\n", stderr);
 				return 1;
 			}
@@ -2464,13 +2734,13 @@ static int erase_cmd(int argc, char * const argv[]) {
 			clear_sec_block = 0;
 			break;
 		case '?':
-			subcmd_usage(stderr, argv[0]);
+			subcmd_usage(stderr, argv[0], NULL);
 			return 1;
 		}
 	}
 
 	if (argc - optind != 1) {
-		subcmd_usage(stderr, argv[0]);
+		subcmd_usage(stderr, argv[0], NULL);
 		return 1;
 	}
 

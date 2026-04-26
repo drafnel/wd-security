@@ -1701,6 +1701,60 @@ static int handy_store_set_cmd (const char *super, int argc,
 	return err;
 }
 
+static const struct {
+	const char *name;
+	uint32_t   block;
+} hs_block_names[] = {
+	{ "security", WD_SECURITY_HANDY_STORE_SECURITY_BLOCK },
+	{ "sec", WD_SECURITY_HANDY_STORE_SECURITY_BLOCK },
+	{ "user", WD_SECURITY_HANDY_STORE_USER_BLOCK },
+};
+
+static int hs_block_name_to_addr (wds_handle *wds, const char *s,
+		uint32_t *addr)
+{
+	size_t i;
+	unsigned long val;
+
+	for (i = 0; i < ARRAY_LEN(hs_block_names); i++) {
+		if (!strcmp(s, hs_block_names[i].name)) {
+			*addr = hs_block_names[i].block;
+			return 0;
+		}
+	}
+
+	if (!strcmp(s, "security-backup") || !strcmp(s, "sec-backup")) {
+		struct wds_handy_capacity hc;
+		int err;
+
+		err = wds_read_handy_capacity(wds, &hc);
+		if (err) {
+			fprintf(stderr, "Error: failed reading Handy Store "
+					"capacity: %s\n",
+					wds_strerror(err));
+			return 1;
+		}
+
+		val = hc.last_block - HANDY_STORE_SECURITY_BLOCK_BACKUP_OFFSET;
+		if (val < HANDY_STORE_BLOCK_MIN || val > hc.last_block)
+		{
+			fputs("Error: Handy Store too small to support backup "
+				"Security Block\n", stderr);
+			return 1;
+		}
+	} else
+		val = strtoul_or_die(s, 0);
+
+	if (val > UINT32_MAX) {
+		fputs("Error: block address out-of-range\n", stderr);
+		return 1;
+	}
+
+	*addr = val;
+
+	return 0;
+}
+
 static void vhandy_store_write_cmd_usage (FILE *fp, va_list ap) {
 	vsubcmd_usage_pre(fp, ap);
 	fputs("[--help] [OPTIONS] <filename> <device> <block-addr>\n", fp);
@@ -1729,6 +1783,7 @@ static int handy_store_write_cmd (const char *super, int argc,
 	wds_handle *wds;
 	const char *filename;
 	const char *devpath;
+	const char *hs_block_s;
 	uint8_t *buf = NULL;
 	size_t len = 0;
 	unsigned long val;
@@ -1783,12 +1838,7 @@ static int handy_store_write_cmd (const char *super, int argc,
 
 	filename = argv[optind++];
 	devpath = argv[optind++];
-	val = strtoul_or_die(argv[optind++], 0);
-	if (val > UINT32_MAX) {
-		fputs("Error: block address out-of-range\n", stderr);
-		return 1;
-	}
-	hs_block = val;
+	hs_block_s = argv[optind++];
 
 	LOG(1, "Opening device %s...", devpath);
 
@@ -1800,6 +1850,15 @@ static int handy_store_write_cmd (const char *super, int argc,
 	}
 
 	LOG(1, "done.\n");
+
+	LOG(1, "Parsing block-addr \"%s\"...", hs_block_s);
+
+	if (hs_block_name_to_addr(wds, hs_block_s, &hs_block)) {
+		wds_close(wds);
+		return 1;
+	}
+
+	LOG(1, "%" PRIu32 ".\n", hs_block);
 
 	if (!whole_file) {
 		struct wds_handy_capacity hc;
@@ -1913,6 +1972,7 @@ static int handy_store_read_cmd (const char *super, int argc,
 	FILE *fp = NULL;
 	const char *filename = NULL;
 	const char *devpath;
+	const char *hs_block_s;
 	uint8_t *buf = NULL;
 	size_t len = 0;
 	unsigned long val;
@@ -1963,12 +2023,7 @@ static int handy_store_read_cmd (const char *super, int argc,
 	}
 
 	devpath = argv[optind++];
-	val = strtoul_or_die(argv[optind++], 0);
-	if (val > UINT32_MAX) {
-		fputs("Error: block address out-of-range\n", stderr);
-		return 1;
-	}
-	hs_block = val;
+	hs_block_s = argv[optind++];
 
 	LOG(1, "Opening device %s...", devpath);
 
@@ -1980,6 +2035,15 @@ static int handy_store_read_cmd (const char *super, int argc,
 	}
 
 	LOG(1, "done.\n");
+
+	LOG(1, "Parsing block-addr \"%s\"...", hs_block_s);
+
+	if (hs_block_name_to_addr(wds, hs_block_s, &hs_block)) {
+		wds_close(wds);
+		return 1;
+	}
+
+	LOG(1, "%" PRIu32 ".\n", hs_block);
 
 	err = read_handy_store_blocks(wds, hs_block, num_blocks, &buf, &len);
 	if (err) {

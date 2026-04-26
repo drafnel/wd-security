@@ -406,7 +406,20 @@ Display Security and User blocks of Handy Store.
 
 Read Handy Store block _block-addr_ and display in human-readable form.
 +
-_block-addr_ should be in the range 0 to <<hs-last-block,[Last Block]>>.
+_block-addr_ should be in the range 0 to <<hs-last-block,[Last Block]>>,
+or one of the following named blocks:
++
+[cols=">.^1,<.^1"]
+|===
+|"security" or "sec"
+|Security Block
+
+|"user"
+|User Block
+
+|"security-backup" or "sec-backup"
+|backup Security Block
+|===
 
   OPTIONS:::
 
@@ -423,7 +436,20 @@ Write contents of _filename_ to Handy Store block _block_addr_.
 The file will be read in units of the Handy Store
 <<hs-block-size,[Block Size]>>.
 +
-_block-addr_ should be in the range 0 to <<hs-last-block,[Last Block]>>.
+_block-addr_ should be in the range 0 to <<hs-last-block,[Last Block]>>,
+or one of the following named blocks:
++
+[cols=">.^1,<.^1"]
+|===
+|"security" or "sec"
+|Security Block
+
+|"user"
+|User Block
+
+|"security-backup" or "sec-backup"
+|backup Security Block
+|===
 
   OPTIONS:::
 

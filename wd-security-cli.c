@@ -87,6 +87,18 @@
 #define HS_WDP_FORCE   0x02
 #define HS_WDP_MASK    0xff
 
+#define HS_BKUP_RD     0x10
+#define HS_BKUP_WR     0x20
+#define HS_BKUP_SAFE   0x40
+
+#define HS_BKUP_DFLT   (HS_BKUP_WR | HS_BKUP_SAFE)
+
+/* First writable Handy Store block */
+#define HANDY_STORE_BLOCK_MIN (WD_SECURITY_HANDY_STORE_USER_BLOCK + 1)
+
+/* Offset relative to last Handy Store block */
+#define HANDY_STORE_SECURITY_BLOCK_BACKUP_OFFSET 0
+
 #define LOG(_level, ...) do {                 \
 	if (verbose >= (_level))              \
 		fprintf(stderr, __VA_ARGS__); \
@@ -721,6 +733,142 @@ static int fill_random (uint8_t *buf, size_t count, int ucs2only) {
 	return 0;
 }
 
+static int write_handy_store_security_block_backup (struct wds_handle *wds,
+		const struct wds_handy_store_security_block *sb, unsigned flags)
+{
+	struct wds_handy_capacity hc;
+	char *buf;
+	size_t len;
+	uint32_t hs_block;
+	int err;
+
+	err = wds_read_handy_capacity(wds, &hc);
+	if (err)
+		return err;
+
+	hs_block = hc.last_block - HANDY_STORE_SECURITY_BLOCK_BACKUP_OFFSET;
+	if (hs_block < HANDY_STORE_BLOCK_MIN || hs_block > hc.last_block)
+	{
+		/* Handy Store is too small for backups */
+		return WD_SECURITY_ENOTSUP;
+	}
+
+	len = hc.length;
+	buf = xmalloc(len);
+
+	/* Ensure the block is either empty or a Security Block */
+	if (WDS_IS_SET(flags, HS_BKUP_SAFE)) {
+
+		err = wds_read_handy_store_blocks(wds, hs_block, 1, buf, &len);
+		if (err) {
+			free(buf);
+			return err;
+		}
+
+		/* if not all zeros */
+		if (len && (buf[0] || memcmp(buf, buf + 1, len - 1))) {
+			struct wds_handy_store_security_block tmp;
+			err = wds_decode_handy_store_security_block(buf, len, &tmp);
+			if (err) {
+				free(buf);
+				return err;
+			}
+		}
+
+		len = hc.length;
+	}
+
+	err = wds_encode_handy_store_security_block(sb, buf, len);
+	if (err) {
+		free(buf);
+		return err;
+	}
+
+	err = wds_write_handy_store_blocks(wds, hs_block, 1, buf, &len);
+
+	free(buf);
+
+	return err;
+}
+
+static int write_handy_store_security_block (struct wds_handle *wds,
+		const struct wds_handy_store_security_block *sb, unsigned flags)
+{
+	int err;
+
+	err = wds_write_handy_store_security_block(wds, sb);
+
+	if (!err && WDS_IS_SET(flags, HS_BKUP_WR)) {
+		err = write_handy_store_security_block_backup(wds, sb, flags);
+		switch (err) {
+		case WD_SECURITY_ENOTSUP:
+		case 0:
+			/* ignore */
+			break;
+		case WD_SECURITY_ESIZE:
+		case WD_SECURITY_ESIG:
+		case WD_SECURITY_ECHKSUM:
+			fputs("Warning: failed writing backup Handy Store "
+				"Security block: not empty\n", stderr);
+			break;
+		default:
+			fprintf(stderr, "Warning: failed writing backup Handy "
+				"Store Security block: %s\n",
+				wds_strerror(err));
+			break;
+		}
+		/* clear error, report success */
+		err = 0;
+	}
+
+	return err;
+}
+
+static int read_handy_store_security_block_backup (struct wds_handle *wds,
+		struct wds_handy_store_security_block* sb)
+{
+	struct wds_handy_capacity hc;
+	char *buf;
+	size_t len;
+	uint32_t hs_block;
+	int err;
+
+	err = wds_read_handy_capacity(wds, &hc);
+	if (err)
+		return err;
+
+	hs_block = hc.last_block - HANDY_STORE_SECURITY_BLOCK_BACKUP_OFFSET;
+	if (hs_block < HANDY_STORE_BLOCK_MIN || hs_block > hc.last_block)
+	{
+		/* Handy Store is too small for backups */
+		return WD_SECURITY_ENOTSUP;
+	}
+
+	len = hc.length;
+	buf = xmalloc(len);
+
+	err = wds_read_handy_store_blocks(wds, hs_block, 1, buf, &len);
+	if (err) {
+		free(buf);
+		return err;
+	}
+
+	err = wds_decode_handy_store_security_block(buf, len, sb);
+
+	free(buf);
+
+	return err;
+}
+
+static int read_handy_store_security_block (struct wds_handle *wds,
+		struct wds_handy_store_security_block* sb, unsigned flags)
+{
+	if (WDS_IS_SET(flags, HS_BKUP_RD))
+		return read_handy_store_security_block_backup(wds, sb);
+
+	return wds_read_handy_store_security_block(wds, sb);
+}
+
 static int write_drive_label (wds_handle *wds, const char *label_arg) {
 	struct wds_handy_store_user_block ub;
 	size_t len;
@@ -748,7 +896,9 @@ static int write_drive_label (wds_handle *wds, const char *label_arg) {
 	return 0;
 }
 
-static int write_password_hint (wds_handle *wds, const char *hint_arg) {
+static int write_password_hint (wds_handle *wds, const char *hint_arg,
+		unsigned hs_flags)
+{
 	struct wds_handy_store_security_block sb;
 	size_t len;
 	int new_block = 0;
@@ -780,7 +930,7 @@ static int write_password_hint (wds_handle *wds, const char *hint_arg) {
 	/* Avoid writing an empty hint if there is currently no security
 	 * block */
 	if (len || !new_block) {
-		err = wds_write_handy_store_security_block(wds, &sb);
+		err = write_handy_store_security_block(wds, &sb, hs_flags);
 		if (err) {
 			fprintf(stderr, "Error: failed writing hint: %s\n",
 					wds_strerror(err));
@@ -974,7 +1124,7 @@ static void read_security_block_nofail (wds_handle *wds,
 		struct wds_handy_store_security_block *sb,
 		unsigned flags)
 {
-	if (wds_read_handy_store_security_block(wds, sb)) {
+	if (read_handy_store_security_block(wds, sb, flags)) {
 		memcpy(sb->salt, WD_SECURITY_DEFAULT_SALT, sizeof(sb->salt));
 		sb->iterations = WD_SECURITY_DEFAULT_ITERATIONS;
 		memset(sb->hint, 0, sizeof(sb->hint));
@@ -1207,7 +1357,7 @@ static int show_handy_store_security_block (FILE *fp, struct wds_handle *wds,
 	struct wds_handy_store_security_block sb;
 	int err;
 
-	err = wds_read_handy_store_security_block(wds, &sb);
+	err = read_handy_store_security_block(wds, &sb, flags);
 
 	if (err == WD_SECURITY_ESIG || err == WD_SECURITY_ECHKSUM) {
 		fprintf(fp, "No Handy Store Security Block\n");
@@ -1339,6 +1489,7 @@ static int handy_store_capacity_cmd (const char * const super, int argc,
 	"Display Security and User blocks of Handy Store."
 
 #define HANDY_STORE_SHOW_HELP_OPTS                              \
+	"--backup           display backup Security Block\n"    \
 	"--no-wdp-utils     don't detect wdpassport-utils.py\n" \
 	"--wdp-utils        force wdpassport-utils.py quirks\n" \
 	"--verbose          increase verbosity\n"               \
@@ -1351,17 +1502,18 @@ static int handy_store_show_cmd (const char *super, int argc,
 	wds_handle *wds;
 	int err;
 	int opt;
-	unsigned hs_flags = HS_WDP_AUTO;
+	unsigned hs_flags = HS_WDP_AUTO | HS_BKUP_DFLT;
 	const struct option long_options[] = {
 		{ "help", no_argument, NULL, 'h' },
 		{ "verbose", no_argument, NULL, 'v' },
+		{ "backup", no_argument, NULL, 'b' },
 		{ "no-wdp-utils", no_argument, NULL, 'N' },
 		{ "wdp-utils", no_argument, NULL, 'W' },
 		{ NULL, 0, 0, 0 }
 	};
 
 	optind = 1;
-	while ((opt = getopt_long(argc, argv, "hvNW", long_options, NULL)) != -1)
+	while ((opt = getopt_long(argc, argv, "bhvNW", long_options, NULL)) != -1)
 	{
 		switch (opt) {
 		case 'h':
@@ -1371,6 +1523,9 @@ static int handy_store_show_cmd (const char *super, int argc,
 			return 0;
 		case 'v':
 			verbose++;
+			break;
+		case 'b':
+			WDS_SET(hs_flags, HS_BKUP_RD);
 			break;
 		case 'N':
 			WDS_UNSET(hs_flags, HS_WDP_MASK);
@@ -1433,6 +1588,7 @@ static void handy_store_set_cmd_usage (FILE *fp, ...)
 	"   label - Drive Label"
 
 #define HANDY_STORE_SET_HELP_OPTS                 \
+	"--no-backup        don't write backup\n" \
 	"--verbose          increase verbosity\n" \
 	"--help             this text\n"
 
@@ -1443,16 +1599,18 @@ static int handy_store_set_cmd (const char *super, int argc,
 	wds_handle *wds;
 	int err;
 	int opt;
+	unsigned hs_flags = HS_WDP_AUTO | HS_BKUP_DFLT;
 	const struct option long_options[] = {
 		{ "help", no_argument, NULL, 'h' },
 		{ "verbose", no_argument, NULL, 'v' },
+		{ "no-backup", no_argument, NULL, 'B' },
 		{ NULL, 0, 0, 0 }
 	};
 	const char *label_arg = NULL;
 	const char *hint_arg = NULL;
 
 	optind = 1;
-	while ((opt = getopt_long(argc, argv, "hv", long_options, NULL)) != -1)
+	while ((opt = getopt_long(argc, argv, "Bhv", long_options, NULL)) != -1)
 	{
 		switch (opt) {
 		case 'h':
@@ -1463,6 +1621,9 @@ static int handy_store_set_cmd (const char *super, int argc,
 			return 0;
 		case 'v':
 			verbose++;
+			break;
+		case 'B':
+			WDS_UNSET(hs_flags, HS_BKUP_WR);
 			break;
 		case '?':
 			handy_store_set_cmd_usage(stderr, super, argv[0], NULL);
@@ -1504,7 +1665,7 @@ static int handy_store_set_cmd (const char *super, int argc,
 	if (hint_arg) {
 		printf("Writing password hint to Handy Store Security Block...");
 		fflush(stdout);
-		if (write_password_hint(wds, hint_arg)) {
+		if (write_password_hint(wds, hint_arg, hs_flags)) {
 			fprintf(stderr, "FAILED\n");
 			err = 1;
 		} else
@@ -1874,12 +2035,12 @@ static void handy_store_cmd_usage (FILE *fp, const char *super) {
 	"in special sectors on the drive called the Handy Store.  The two\n"  \
 	"known blocks are named the Security Block and the User Block.\n"     \
 	"\n"                                                                  \
-	"Security Block\n"                                                    \
+	"Security Block(" str(WD_SECURITY_HANDY_STORE_SECURITY_BLOCK) ")\n"   \
 	"--------------\n"                                                    \
 	"Stores the password hint, as well as the salt and number of\n"       \
 	"iteration rounds used to generate the Key Encryption Key (KEK).\n"   \
 	"\n"                                                                  \
-	"User Block\n"                                                        \
+	"User Block(" str(WD_SECURITY_HANDY_STORE_USER_BLOCK) ")\n"           \
 	"----------\n"                                                        \
 	"Stores a drive label."
 
@@ -2329,6 +2490,9 @@ static int unlock (wds_handle *wds, const uint8_t *salt, size_t salt_bytes,
 	"--iterations <num>   number of hash iterations to perform.\n"   \
 	"                     Overrides Handy Store.\n"                  \
 	"--write-handy-store  write salt/iterations to Handy Store\n"    \
+	"--use-backup         use backup Handy Store Security Block\n"   \
+	"--no-backup          do not write salt/iterations to the\n"     \
+	"                     backup Handy Store Security Block\n"       \
 	"--rescan             reread partition table after unlock\n"     \
 	"--no-wdp-utils       don't detect wdpassport-utils.py\n"        \
 	"--wdp-utils          force wdpassport-utils.py quirks\n"        \
@@ -2353,7 +2517,7 @@ static int unlock_cmd (int argc, char * const argv[]) {
 	int write_handy_store = 0;
 	int err;
 	int opt;
-	unsigned hs_flags = HS_WDP_AUTO;
+	unsigned hs_flags = HS_WDP_AUTO | HS_BKUP_DFLT;
 	const struct option long_options[] = {
 		{ "help", no_argument, NULL, 'h' },
 		{ "verbose", no_argument, NULL, 'v' },
@@ -2363,6 +2527,8 @@ static int unlock_cmd (int argc, char * const argv[]) {
 		{ "salt-file", required_argument, NULL, 'S' },
 		{ "iterations", required_argument, NULL, 'i' },
 		{ "write-handy-store", no_argument, NULL, 'w' },
+		{ "use-backup", no_argument, NULL, 'b'},
+		{ "no-backup", no_argument, NULL, 'B' },
 		{ "no-wdp-utils", no_argument, NULL, 'N' },
 		{ "wdp-utils", no_argument, NULL, 'W' },
 		{ "rescan", no_argument, NULL, 'R' },
@@ -2370,7 +2536,7 @@ static int unlock_cmd (int argc, char * const argv[]) {
 	};
 
 	optind = 1;
-	while ((opt = getopt_long(argc, argv, "hvp:Rd:s:S:i:wNW", long_options,
+	while ((opt = getopt_long(argc, argv, "hvbBp:Rd:s:S:i:wNW", long_options,
 					NULL)) != -1)
 	{
 		switch (opt) {
@@ -2380,6 +2546,12 @@ static int unlock_cmd (int argc, char * const argv[]) {
 			return 0;
 		case 'v':
 			verbose++;
+			break;
+		case 'b':
+			WDS_SET(hs_flags, HS_BKUP_RD);
+			break;
+		case 'B':
+			WDS_UNSET(hs_flags, HS_BKUP_WR);
 			break;
 		case 'd':
 			key_file = optarg;
@@ -2486,7 +2658,7 @@ static int unlock_cmd (int argc, char * const argv[]) {
 
 			LOG(1, "Writing new Handy Store Security Block...\n");
 
-			err = wds_write_handy_store_security_block(wds, &sb);
+			err = write_handy_store_security_block(wds, &sb, hs_flags);
 			if (err) {
 				fprintf(stderr, "Error: failed writing new "
 						"Security Block: %s\n",
@@ -2597,6 +2769,9 @@ static int changepw (wds_handle *wds, const uint8_t *salt, size_t salt_bytes,
 	"                       protection.  Overrides Handy Store.\n"        \
 	"--iter-time <ms>       milliseconds for hash iteration rounds\n"     \
 	"                       (default: " str(DEFAULT_ITER_TIME) ")\n"      \
+	"--use-backup           use backup Handy Store Security Block\n"      \
+	"--no-backup            do not write salt/iterations to the\n"        \
+	"                       backup Handy Store Security Block\n"          \
 	"--no-wdp-utils         don't detect wdpassport-utils.py\n"           \
 	"--wdp-utils            force wdpassport-utils.py quirks\n"           \
 	"--verbose              increase verbosity\n"                         \
@@ -2626,7 +2801,7 @@ static int changepw_cmd (int argc, char * const argv[]) {
 	int do_checks = 1;
 	unsigned iter_time = DEFAULT_ITER_TIME;
 	uint16_t key_size;
-	unsigned hs_flags = HS_WDP_AUTO;
+	unsigned hs_flags = HS_WDP_AUTO | HS_BKUP_DFLT;
 	int hint_dirty = 0;
 	int err;
 	int opt;
@@ -2644,13 +2819,15 @@ static int changepw_cmd (int argc, char * const argv[]) {
 		{ "salt-file", required_argument, NULL, 'S' },
 		{ "iterations", required_argument, NULL, 'i' },
 		{ "iter-time", required_argument, NULL, 'I'},
+		{ "use-backup", no_argument, NULL, 'b' },
+		{ "no-backup", no_argument, NULL, 'B' },
 		{ "no-wdp-utils", no_argument, NULL, 'N' },
 		{ "wdp-utils", no_argument, NULL, 'W' },
 		{ NULL, 0, 0, 0 }
 	};
 
 	optind = 1;
-	while ((opt = getopt_long(argc, argv, "hH:i:I:d:D:p:P:s:S:vCXNW",
+	while ((opt = getopt_long(argc, argv, "bBhH:i:I:d:D:p:P:s:S:vCXNW",
 					long_options, NULL)) != -1)
 	{
 		switch (opt) {
@@ -2660,6 +2837,12 @@ static int changepw_cmd (int argc, char * const argv[]) {
 			return 0;
 		case 'v':
 			verbose++;
+			break;
+		case 'b':
+			WDS_SET(hs_flags, HS_BKUP_RD);
+			break;
+		case 'B':
+			WDS_UNSET(hs_flags, HS_BKUP_WR);
 			break;
 		case 'X':
 			disable_protection = 1;
@@ -2826,7 +3009,7 @@ static int changepw_cmd (int argc, char * const argv[]) {
 
 		LOG(1, "Writing new Handy Store Security Block...\n");
 
-		err = wds_write_handy_store_security_block(wds, &sb);
+		err = write_handy_store_security_block(wds, &sb, hs_flags);
 		if (err) {
 			fprintf(stderr, "Error: failed writing Handy Store "
 					"Security Block: %s\n",
@@ -2910,7 +3093,7 @@ static int changepw_cmd (int argc, char * const argv[]) {
 		 * iterations specified on the command line) and the new hint.
 		 */
 		LOG(1, "Updating Handy Store Security Block...\n");
-		err = wds_write_handy_store_security_block(wds, &sb);
+		err = write_handy_store_security_block(wds, &sb, hs_flags);
 		if (err)
 			fprintf(stderr, "Error: failed writing hint to Handy "
 					"Store Security Block: %s\n",

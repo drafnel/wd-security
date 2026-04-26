@@ -56,10 +56,6 @@
 #define WD_SECURITY_MODE_PAGE_SIG 0x30
 #define WD_SECURITY_MAX_CIPHERS 255
 
-/* Addresses of known Handy Store blocks */
-#define WD_SECURITY_HANDY_STORE_SECURITY_BLOCK 1
-#define WD_SECURITY_HANDY_STORE_USER_BLOCK     2
-
 /* SCSI Mode Sense Page Codes */
 #define WD_SECURITY_DEVICE_CONFIGURATION_PAGE_CODE 0x20
 #define WD_SECURITY_OPERATIONS_PAGE_CODE 0x21
@@ -1431,13 +1427,17 @@ static uint8_t checksum (const uint8_t *buf, unsigned len) {
 	return csum;
 }
 
-static int wds_encode_handy_store_security_block (
+int wds_encode_handy_store_security_block (
 		const struct wds_handy_store_security_block *hs,
 		void *buf, size_t len)
 {
 	struct wds_handy_store_security_block_packed *hsp;
 
-	assert(len == sizeof(*hsp));
+	if (len < sizeof(*hsp)) {
+		mesg(ERROR, "buffer too small for Handy Store Security Block, "
+			    "expected %zu, got %zu", sizeof(*hsp), len);
+		return WD_SECURITY_ESIZE;
+	}
 
 	hsp = (struct wds_handy_store_security_block_packed*)buf;
 
@@ -1457,7 +1457,7 @@ static int wds_encode_handy_store_security_block (
 	return 0;
 }
 
-static int wds_decode_handy_store_security_block (const void *buf, size_t len,
+int wds_decode_handy_store_security_block (const void *buf, size_t len,
 		struct wds_handy_store_security_block *hs)
 {
 	const struct wds_handy_store_security_block_packed *hsp;

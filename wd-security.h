@@ -118,6 +118,10 @@ extern "C" {
 #define WD_SECURITY_DEFAULT_SALT_ASCII "WDC."
 #define WD_SECURITY_DEFAULT_SALT wd_security_default_salt
 
+/* Addresses of known Handy Store blocks */
+#define WD_SECURITY_HANDY_STORE_SECURITY_BLOCK 1
+#define WD_SECURITY_HANDY_STORE_USER_BLOCK     2
+
 extern const uint8_t wd_security_default_salt[8];
 
 typedef struct wds_handle wds_handle;
@@ -212,6 +216,11 @@ extern int wds_write_operations_mode_page (wds_handle *wds,
 		const struct wds_operations_mode_page *mode_page,
 		const struct wds_operations_mode_page *mode_page_mask);
 
+extern int wds_decode_handy_store_security_block (const void *buf, size_t len,
+		struct wds_handy_store_security_block *hs);
+extern int wds_encode_handy_store_security_block (
+		const struct wds_handy_store_security_block *hs,
+		void *buf, size_t len);
 extern int wds_generate_kek (const uint8_t *salt, size_t salt_bytes,
 			     const uint8_t *pw, size_t pw_bytes,
 			     unsigned long iterations,

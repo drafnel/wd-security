@@ -97,6 +97,14 @@ compatibility with the proprietary WD Security software.
       See <<_broken_behavior_when_changing_password>> below for an
       explanation.
 
+    *--use-backup*::::
+      Read salt and iterations from the backup Handy Store Security
+      Block.
+
+    *--no-backup*::::
+      Do not write the backup Handy Store Security Block, when
+      *--write-handy-store* is used.
+
     *--rescan*::::
       If _device_ is successfully unlocked, notify the kernel that the
       partition table should be re-read.
@@ -176,6 +184,13 @@ NOTE: Clamped to 32-bits if enabling password protection.
       Calculate a value for hash iterations such that the generation of
       the Key Encryption Key (KEK) will consume _milliseconds_ ms.  The
       default is `2000` ms.
+
+    *--use-backup*::::
+      Read salt and iterations from the backup Handy Store Security
+      Block.
+
+    *--no-backup*::::
+      Do not write the backup Handy Store Security Block.
 
     *--no-wdp-utils*::::
       Don't try to detect whether wdpassport-utils.py was used to
@@ -319,6 +334,21 @@ rounds to use to generate the Key Encryption Key (KEK).
 
 Stores a drive label.
 
+=== Security Block (backup)
+
+Whenever the Security Block is written, *wd-security* will also try to
+write a backup of the Security Block to the last Handy Store block if it
+is empty, or if it contains a previously written Security Block.
+
+TIP: Pass `/dev/zero` as the _filename_ argument of the
+*handy-store write* sub-command to clear a Handy Store block.
+
+This can be useful to recover from the primary Security Block being
+overwritten or otherwise corrupted.  For example, if the proprietary WD
+Security software was used to change the password when the password salt
+and iterations were other than the defaults.  See
+<<_broken_behavior_when_changing_password>> for an explanation.
+
 === Sub-Commands
 
 *handy-store* *info* [_OPTIONS_] _device_::
@@ -346,11 +376,19 @@ For each _name_/_value_ pair, set field _name_ to _value_ in Handy Store.
     *label* _label_::::
         Set the drive label to _label_.
 
+  OPTIONS:::
+
+    *--no-backup*::::
+      Don't write backup Security Block.
+
 *handy-store* *show* [_OPTIONS_] _device_::
 
 Display Security and User blocks of Handy Store.
 
   OPTIONS:::
+
+    *--backup*::::
+      Display the backup Security Block.
 
     *--no-wdp-utils*::::
       Don't try to detect whether wdpassport-utils.py was used to
@@ -593,6 +631,13 @@ Clearing Handy Store Security Block...
 ----
 ====
 
+.Clear Handy Store block 15 on /dev/sdb
+====
+----
+# wd-security handy-store write /dev/zero /dev/sdb 15
+----
+====
+
 == Exit Status
 
 *wd-security* exits with a non-zero status on failure and zero for
@@ -656,7 +701,10 @@ For this reason, it is a good idea to backup the salt and iteration
 count.  If these are known, then access to the drive can be restored by
 overriding the salt and iteration count on the *wd-security*
 command-line when unlocking the drive with the new password, and
-optionally restoring the Security Block.
+optionally restoring the Security Block.  By default, *wd-security* will
+create a backup of the Security Block when enabling password protection,
+which may then be used to unlock a drive.  See
+<<_security_block_backup>>.
 
 TIP: Never use the proprietary WD Security software to _change_ the
 password.

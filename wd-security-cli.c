@@ -1526,6 +1526,322 @@ static int handy_store_set_cmd (const char *super, int argc,
 	return err;
 }
 
+static void vhandy_store_write_cmd_usage (FILE *fp, va_list ap) {
+	vsubcmd_usage_pre(fp, ap);
+	fputs("[--help] [OPTIONS] <filename> <device> <block-addr>\n", fp);
+}
+
+static void handy_store_write_cmd_usage (FILE *fp, ...)
+{
+	va_list ap;
+	va_start(ap, fp);
+	vhandy_store_write_cmd_usage(fp, ap);
+	va_end(ap);
+}
+
+#define HANDY_STORE_WRITE_HELP_BRIEF \
+	"Write contents of <filename> to Handy Store block <block-addr>."
+
+#define HANDY_STORE_WRITE_HELP_OPTS                      \
+	"--full             read whole file\n"           \
+	"-n <num>           number of blocks to write\n" \
+	"--verbose          increase verbosity\n"        \
+	"--help             this text\n"
+
+static int handy_store_write_cmd (const char *super, int argc,
+		char * const argv[])
+{
+	wds_handle *wds;
+	const char *filename;
+	const char *devpath;
+	uint8_t *buf = NULL;
+	size_t len = 0;
+	unsigned long val;
+	uint32_t hs_block;
+	uint16_t num_blocks = 1;
+	int whole_file = 0;
+	int err;
+	int opt;
+	const struct option long_options[] = {
+		{ "help", no_argument, NULL, 'h' },
+		{ "verbose", no_argument, NULL, 'v' },
+		{ "full", no_argument, NULL, 'F' },
+		{ NULL, 0, 0, 0 }
+	};
+
+	optind = 1;
+	while ((opt = getopt_long(argc, argv, "hFvn:", long_options, NULL)) != -1)
+	{
+		switch (opt) {
+		case 'F':
+			whole_file = 1;
+			break;
+		case 'n':
+			val = strtoul_or_die(optarg, 0);
+			if (val > UINT16_MAX) {
+				fprintf(stderr, "Warning: clamping block count "
+					"to UINT16_MAX\n");
+				val = UINT16_MAX;
+			}
+			num_blocks = val;
+			break;
+		case 'h':
+			subcmd_help(vhandy_store_write_cmd_usage,
+				HANDY_STORE_WRITE_HELP_BRIEF,
+				HANDY_STORE_WRITE_HELP_OPTS, super, argv[0],
+				NULL);
+			return 0;
+		case 'v':
+			verbose++;
+			break;
+		case '?':
+			handy_store_write_cmd_usage(stderr, super, argv[0],
+				NULL);
+			return 1;
+		}
+	}
+
+	if (argc - optind != 3) {
+		handy_store_write_cmd_usage(stderr, super, argv[0], NULL);
+		return 1;
+	}
+
+	filename = argv[optind++];
+	devpath = argv[optind++];
+	val = strtoul_or_die(argv[optind++], 0);
+	if (val > UINT32_MAX) {
+		fputs("Error: block address out-of-range\n", stderr);
+		return 1;
+	}
+	hs_block = val;
+
+	LOG(1, "Opening device %s...", devpath);
+
+	wds = wds_open(devpath, NULL, &err);
+	if (!wds) {
+		fprintf(stderr, "Error: failed opening device: %s\n",
+				wds_strerror(err));
+		return 1;
+	}
+
+	LOG(1, "done.\n");
+
+	if (!whole_file) {
+		struct wds_handy_capacity hc;
+
+		LOG(1, "Reading Handy Store block size...");
+
+		err = wds_read_handy_capacity(wds, &hc);
+		if (err) {
+			fprintf(stderr, "Error: failed reading Handy Store "
+					"capacity: %s\n",
+					wds_strerror(err));
+			wds_close(wds);
+			return 1;
+		}
+
+		LOG(1, "%" PRIu32 " bytes.\n", hc.length);
+
+		len = hc.length * num_blocks;
+	}
+
+	LOG(1, "Reading file %s...", filename);
+
+	err = read_file(filename, (char**)&buf, &len);
+	if (err) {
+		wds_close(wds);
+		return 1;
+	}
+
+	LOG(1, "done.\n");
+
+	LOG(1, "Writing %zu bytes to Handy Store block %" PRIu32 " (count %"
+		PRIu16 " block)...",
+		len, hs_block, num_blocks);
+
+	err = wds_write_handy_store_blocks(wds, hs_block, num_blocks, buf, &len);
+	if (err)
+		fprintf(stderr, "Error: failed writing Handy Store blocks: %s\n",
+			wds_strerror(err));
+	else
+		LOG(1, "wrote %zu bytes.\n", len);
+
+	free(buf);
+
+	wds_close(wds);
+
+	return !!err;
+}
+
+static void vhandy_store_read_cmd_usage (FILE *fp, va_list ap) {
+	vsubcmd_usage_pre(fp, ap);
+	fputs("[--help] [OPTIONS] <device> <block-addr>\n", fp);
+}
+
+static void handy_store_read_cmd_usage (FILE *fp, ...) {
+	va_list ap;
+	va_start(ap, fp);
+	vhandy_store_read_cmd_usage(fp, ap);
+	va_end(ap);
+}
+
+static int read_handy_store_blocks (wds_handle *wds, uint32_t block,
+		uint16_t num_blocks, uint8_t **bufp, size_t *buf_len)
+{
+	uint8_t *buf = *bufp;
+	size_t len = *buf_len;
+	int err;
+
+	if (!buf) {
+		struct wds_handy_capacity hc;
+
+		LOG(1, "Reading Handy Store block size...");
+
+		err = wds_read_handy_capacity(wds, &hc);
+		if (err)
+			return err;
+
+		LOG(1, "%" PRIu32 " bytes.\n", hc.length);
+
+		len = hc.length * num_blocks;
+		buf = xmalloc(len);
+	}
+
+	LOG(1, "Reading %zu bytes from Handy Store block %" PRIu32 " (%" PRIu16
+		" block(s))...", len, block, num_blocks);
+
+	err = wds_read_handy_store_blocks(wds, block, num_blocks, buf, &len);
+	if (!err) {
+		LOG(1, "read %zu bytes.\n", len);
+		*buf_len = len;
+		if (*bufp != buf)
+			*bufp = buf;
+	} else if (*bufp != buf)
+		free(buf);
+
+	return err;
+}
+
+#define HANDY_STORE_READ_HELP_BRIEF \
+	"Read Handy Store block <block-addr>"
+
+#define HANDY_STORE_READ_HELP_OPTS                               \
+	"-n <num>           read <num> blocks\n"                 \
+	"-o <file>          write raw binary output to <file>\n" \
+	"--verbose          increase verbosity\n"                \
+	"--help             this text\n"
+
+static int handy_store_read_cmd (const char *super, int argc,
+		char * const argv[])
+{
+	wds_handle *wds;
+	FILE *fp = NULL;
+	const char *filename = NULL;
+	const char *devpath;
+	uint8_t *buf = NULL;
+	size_t len = 0;
+	unsigned long val;
+	uint32_t hs_block;
+	uint16_t num_blocks = 1;
+	int err;
+	int opt;
+	const struct option long_options[] = {
+		{ "help", no_argument, NULL, 'h' },
+		{ "verbose", no_argument, NULL, 'v' },
+		{ NULL, 0, 0, 0 }
+	};
+
+	optind = 1;
+	while ((opt = getopt_long(argc, argv, "hvn:o:", long_options, NULL)) != -1)
+	{
+		switch (opt) {
+		case 'h':
+			subcmd_help(vhandy_store_read_cmd_usage,
+				HANDY_STORE_READ_HELP_BRIEF,
+				HANDY_STORE_READ_HELP_OPTS, super, argv[0],
+				NULL);
+			return 0;
+		case 'v':
+			verbose++;
+			break;
+		case 'n':
+			val = strtoul_or_die(optarg, 0);
+			if (val > UINT16_MAX) {
+				fprintf(stderr, "Warning: clamping block count "
+					"to UINT16_MAX\n");
+				val = UINT16_MAX;
+			}
+			num_blocks = val;
+			break;
+		case 'o':
+			filename = optarg;
+			break;
+		case '?':
+			handy_store_read_cmd_usage(stderr, super, argv[0], NULL);
+			return 1;
+		}
+	}
+
+	if (argc - optind != 2) {
+		handy_store_read_cmd_usage(stderr, super, argv[0], NULL);
+		return 1;
+	}
+
+	devpath = argv[optind++];
+	val = strtoul_or_die(argv[optind++], 0);
+	if (val > UINT32_MAX) {
+		fputs("Error: block address out-of-range\n", stderr);
+		return 1;
+	}
+	hs_block = val;
+
+	LOG(1, "Opening device %s...", devpath);
+
+	wds = wds_open(devpath, NULL, &err);
+	if (!wds) {
+		fprintf(stderr, "Error: failed opening device: %s\n",
+				wds_strerror(err));
+		return 1;
+	}
+
+	LOG(1, "done.\n");
+
+	err = read_handy_store_blocks(wds, hs_block, num_blocks, &buf, &len);
+	if (err) {
+		fprintf(stderr, "Error: failed reading from Handy Store: %s\n",
+				wds_strerror(err));
+	} else if (filename) {
+		LOG(1, "Writing output to %s...",
+			strcmp(filename, "-") ? filename : "stdout");
+		if (!strcmp(filename, "-"))
+			fp = stdout;
+		else
+			fp = fopen(filename, "w");
+		if (!fp) {
+			perror("failed opening file");
+			err = 1;
+		} else if (fwrite(buf, len, 1, fp) != 1 || fflush(fp)) {
+			perror("failed writing to file");
+			err = 1;
+			if (fp != stdout)
+				fclose(fp);
+		} else if (fp != stdout && fclose(fp)) {
+			perror("failed closing file");
+			err = 1;
+		} else
+			LOG(1, "done.\n");
+	} else {
+		hexdump(stdout, buf, len);
+		putchar('\n');
+	}
+
+	free(buf);
+
+	wds_close(wds);
+
+	return !!err;
+}
+
 static int handy_store_cmd_help (const char *, int argc, char * const argv[]);
 
 static const struct {
@@ -1536,6 +1852,8 @@ static const struct {
 	{ "info", handy_store_capacity_cmd, "show geometry" },
 	{ "set", handy_store_set_cmd, "set configurable fields" },
 	{ "show", handy_store_show_cmd, "display known blocks" },
+	{ "read", handy_store_read_cmd, "read raw bytes" },
+	{ "write", handy_store_write_cmd, "write raw bytes" },
 	{ "help", handy_store_cmd_help, "this text" },
 };
 

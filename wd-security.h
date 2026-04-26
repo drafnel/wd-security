@@ -183,6 +183,11 @@ extern int wds_erase (wds_handle *wds, const uint8_t reset_syn[4],
 		      unsigned combine);
 
 extern int wds_read_handy_capacity (wds_handle*, struct wds_handy_capacity*);
+extern int wds_read_handy_store_blocks (wds_handle *wds, uint32_t block,
+		uint16_t num_blocks, void *buf, size_t *buf_len);
+extern int wds_write_handy_store_blocks (struct wds_handle *wds, uint32_t block,
+		uint16_t num_blocks, const void *buf, size_t *buf_len);
+
 extern int wds_read_handy_store_security_block (wds_handle*,
 		struct wds_handy_store_security_block*);
 extern int wds_read_handy_store_user_block (wds_handle*,

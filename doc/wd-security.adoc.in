@@ -328,10 +328,10 @@ Show geometry of Handy Store.
   Last Block:::
     Address of last block.
 
-  Block Size:::
+  anchor:hs-block-size[]Block Size:::
     Size (bytes) of each block.
 
-  Xfer Max:::
+  anchor:hs-xfer-max[]Xfer Max:::
     Maximum number of blocks that may be transferred at a time.
 
 *handy-store* *set* [_OPTIONS_] _device_ _name_=_value_ [_name_=_value_ ...]::
@@ -359,6 +359,33 @@ Display Security and User blocks of Handy Store.
 
     *--wdp-utils*::::
       Force-enable compatibility quirks for wdpassport-utils.py.
+
+*handy-store* *read* [_OPTIONS_] _device_ _block-addr_::
+
+Read Handy Store block _block-addr_ and display in human-readable form.
+
+  OPTIONS:::
+
+    *-n* _num_::::
+    Read _num_ blocks (see <<hs-xfer-max,[Xfer Max]>>).
+
+    *-o* _filename_::::
+    Write raw binary output to _filename_.
+
+*handy-store* *write* [_OPTIONS_] _filename_ _device_ _block-addr_::
+
+Write contents of _filename_ to Handy Store block _block_addr_.
++
+The file will be read in units of the Handy Store
+<<hs-block-size,[Block Size]>>.
+
+  OPTIONS:::
+
+    *--full*::::
+    Read whole file.
+
+    *-n* _num_::::
+    Write _num_ blocks (see <<hs-xfer-max,[Xfer Max]>>).
 
 == Automatic Unlocking
 

@@ -1564,8 +1564,7 @@ static int decode_sense_data_handy_store (const struct sense_data_packed *sdp)
 	return decode_sense_data_generic(sdp);
 }
 
-/* TODO: expose this function */
-static int wds_write_handy_store_blocks (struct wds_handle *wds, uint32_t block,
+int wds_write_handy_store_blocks (struct wds_handle *wds, uint32_t block,
 		uint16_t num_blocks, const void *buf, size_t *buf_len)
 {
 	struct wds_vsc_cdb cdb = WD_SECURITY_VSC_CDB_HANDY_STORE_WR_INIT;
@@ -1624,8 +1623,7 @@ int wds_write_handy_store_user_block (struct wds_handle *wds,
 			WD_SECURITY_HANDY_STORE_USER_BLOCK, 1, &hsp, &len);
 }
 
-/* TODO: expose this function */
-static int wds_read_handy_store_blocks (struct wds_handle *wds, uint32_t block,
+int wds_read_handy_store_blocks (struct wds_handle *wds, uint32_t block,
 		uint16_t num_blocks, void *buf, size_t *buf_len)
 {
 	struct wds_vsc_cdb cdb = WD_SECURITY_VSC_CDB_HANDY_STORE_RD_INIT;

@@ -8,6 +8,9 @@
 /config.status
 /configure
 /configure~
+/.libs/
+/libtool
+/libwd-security.la
 /Makefile
 /Makefile.in
 /stamp-h1
@@ -20,4 +23,5 @@
 /wd-security.1
 /wd-security.adoc
 /wd-security-cli.o
+/wd-security.lo
 /wd-security.o

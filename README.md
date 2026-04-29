@@ -112,6 +112,12 @@ The `wd-security-devices.sh` script can be used to list all attached
 Western Digital drives along with the name of the _Key File_ that should
 be created to enable automatic unlocking.
 
+## Shared and Static library
+
+The core plumbing is exposed as a library, making it possible to build a
+separate application and link against the library, and/or create a
+wrapper for an alternative programming language.
+
 ## References
 
 @DanLukes' excellent documentation[^2] of the protocol has been

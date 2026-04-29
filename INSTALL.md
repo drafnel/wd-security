@@ -10,6 +10,7 @@
 If building directly from the git repository, additionally:
 
 - autoconf
+- libtool
 
 ## CONFIGURE
 
@@ -50,6 +51,9 @@ Then install (probably as root):
 
 This should create the following files:
 
+    libwd-security0_<version>_<arch>.deb
+    libwd-security0-dbgsym_<version>_<arch>.ddeb
+    libwd-security0-dev_<version>_<arch>.deb
     wd-security_<version>_<arch>.buildinfo
     wd-security_<version>_<arch>.changes
     wd-security_<version>_<arch>.deb
@@ -57,6 +61,6 @@ This should create the following files:
     wd-security_<version>.tar.xz
     wd-security-dbgsym_<version>_<arch>.ddeb
 
-Use `dpkg` to install the binary package:
+Use `dpkg` to install the binary and library packages:
 
-    sudo dpkg -i wd-security_<version>_<arch>.deb
+    sudo dpkg -i wd-security_<version>_<arch>.deb libwd-security0_<version>_<arch>.deb

@@ -84,6 +84,7 @@ AC_FUNC_MALLOC
 AC_FUNC_REALLOC
 AC_CHECK_FUNCS([EVP_MD_fetch EVP_sha256 getrandom iconv memset strchr strrchr strtoul])
 
+LT_INIT()
 
 AC_CONFIG_FILES([Makefile])
 AC_OUTPUT

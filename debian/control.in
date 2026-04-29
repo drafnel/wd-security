@@ -10,7 +10,7 @@ Vcs-Browser: @PACKAGE_URL@
 
 Package: @PACKAGE_TARNAME@
 Architecture: any
-Depends: ${shlibs:Depends}, ${misc:Depends}
+Depends: ${shlibs:Depends}, ${misc:Depends}, lib@PACKAGE_TARNAME@0
 Suggests: udev
 Description: @PACKAGE_NAME@
  Manage password protection of Western Digital external drives supported
@@ -19,3 +19,19 @@ Description: @PACKAGE_NAME@
  Supports encrypted drive unlock, set/change password, secure erase, etc.
  .
  Additionally, automatic unlocking by udev can be configured.
+
+Package: lib@PACKAGE_TARNAME@0
+Architecture: any
+Multi-Arch: same
+Pre-Depends: ${misc:Pre-Depends}
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Section: libs
+Description: @PACKAGE_NAME@ - shared libraries
+
+Package: lib@PACKAGE_TARNAME@0-dev
+Architecture: any
+Multi-Arch: same
+Section: devel
+Depends: ${shlibs:Depends}, ${misc:Depends},
+         lib@PACKAGE_TARNAME@0 (= ${binary:Version})
+Description: @PACKAGE_NAME@ - development files

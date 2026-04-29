@@ -1,0 +1,3 @@
+usr/lib/${DEB_HOST_MULTIARCH}/libwd-security.so
+usr/lib/${DEB_HOST_MULTIARCH}/libwd-security.a
+usr/include/wd-security.h

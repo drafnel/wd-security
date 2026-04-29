@@ -1,0 +1,2 @@
+usr/lib/${DEB_HOST_MULTIARCH}/libwd-security.la
+usr/share/doc/wd-security/COPYING

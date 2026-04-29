@@ -1,13 +1,20 @@
 bin_PROGRAMS = wd-security
-wd_security_SOURCES = wd-security-cli.c wd-security.c encoding.c compat.c
-wd_security_SOURCES += compat.h encoding.h wd-security.h
+wd_security_SOURCES = wd-security-cli.c encoding.c compat.c
+wd_security_SOURCES += compat.h encoding.h
+wd_security_LDADD = libwd-security.la $(LDADD)
 nodist_wd_security_SOURCES = VERSION.h
+lib_LTLIBRARIES = libwd-security.la
+libwd_security_la_SOURCES = wd-security.c
+libwd_security_la_LDFLAGS = -version-info 0:0:0
+include_HEADERS = wd-security.h
 noinst_SCRIPTS = GEN-VERSION.sh GEN-DEB-CHANGELOG.sh
 CLEANFILES = VERSION.h 00-wd-security.rules \
              wd-security.adoc wd-security.xml wd-security.1 \
              wd-security_*.buildinfo wd-security_*.changes \
              wd-security_*.deb wd-security_*.dsc \
-             wd-security_*.tar.xz wd-security-dbgsym_*.ddeb
+             wd-security_*.tar.xz wd-security-dbgsym_*.ddeb \
+             libwd-security0_*.deb libwd-security0-dbgsym_*.ddeb \
+             libwd-security0-dev_*.deb
 EXTRA_DIST = README.md INSTALL.md 00-wd-security.rules.in \
              wd-security-devices.sh doc/wd-security.adoc.in debian
 udevrulesdir = $(prefix)/lib/udev/rules.d

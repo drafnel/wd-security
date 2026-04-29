@@ -1,0 +1,6 @@
+usr/bin/wd-security
+usr/lib/udev/rules.d/00-wd-security.rules
+usr/share/man/man1/wd-security.1
+usr/share/doc/wd-security/wd-security-devices.sh
+usr/share/doc/wd-security/wd-security.adoc
+usr/share/doc/wd-security/README.md

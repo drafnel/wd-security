@@ -39,6 +39,7 @@
 #include <getopt.h>
 #include <inttypes.h>
 #include <termios.h>
+#include <errno.h>
 
 #ifdef HAVE_SYS_RANDOM_H
 #include <sys/random.h>
@@ -118,6 +119,30 @@ static void* xmemdup (const void *src, size_t len) {
 	void *buf = xmalloc(len);
 	memcpy(buf, src, len);
 	return buf;
+}
+
+static unsigned long strtoul_or_die (const char *nptr, int base)
+{
+	char *endptr;
+	unsigned long val;
+
+	errno = 0;
+
+	val = strtoul(nptr, &endptr, base);
+
+	if (errno) {
+		perror("Error: failed parsing number from string");
+		exit(EXIT_FAILURE);
+	}
+
+        /* ensure the entire string was consumed and was not empty */
+	if (!*nptr || *endptr) {
+		fprintf(stderr, "Error: failed parsing number from string "
+			"\"%s\"\n", nptr);
+		exit(EXIT_FAILURE);
+	}
+
+	return val;
 }
 
 static void hexdump (FILE *fp, const uint8_t *buf, size_t len) {
@@ -1433,6 +1458,7 @@ static int config_cmd (int argc, char * const argv[]) {
 					long_options, NULL)) != -1)
 	{
 		switch (opt) {
+		unsigned long ul_tmp;
 		case 'a':
 			WDS_SET(cfg_mask.flags, WD_SECURITY_DISABLE_AP_BIT);
 			WDS_SET(cfg.flags, WD_SECURITY_DISABLE_AP_BIT);
@@ -1442,7 +1468,14 @@ static int config_cmd (int argc, char * const argv[]) {
 			WDS_UNSET(cfg.flags, WD_SECURITY_DISABLE_AP_BIT);
 			break;
 		case 'b':
-			ops.backlight_brite = atoi(optarg);
+			ul_tmp = strtoul_or_die(optarg, 10);
+			if (ul_tmp > UINT8_MAX) {
+				subcmd_usage(stderr, argv[0]);
+				fputs("Error: LCD backlight brightness "
+					"out-of-range\n", stderr);
+				return 1;
+			}
+			ops.backlight_brite = ul_tmp;
 			ops_mask.backlight_brite = 255;
 			break;
 		case 'c':
@@ -1498,7 +1531,14 @@ static int config_cmd (int argc, char * const argv[]) {
 			WDS_UNSET(ops.flags, WD_SECURITY_CDMVALID_BIT);
 			break;
 		case 'p':
-			ops.power_led_brite = (uint8_t)atoi(optarg);
+			ul_tmp = strtoul_or_die(optarg, 10);
+			if (ul_tmp > UINT8_MAX) {
+				subcmd_usage(stderr, argv[0]);
+				fputs("Error: power LED brightness "
+					"out-of-range\n", stderr);
+				return 1;
+			}
+			ops.power_led_brite = ul_tmp;
 			ops_mask.power_led_brite = 255;
 			break;
 		case 'q':
@@ -1770,7 +1810,7 @@ static int unlock_cmd (int argc, char * const argv[]) {
 			salt_file = optarg;
 			break;
 		case 'i':
-			iterations = strtoul(optarg, NULL, 0);
+			iterations = strtoul_or_die(optarg, 0);
 			break;
 		case 'w':
 			write_handy_store = 1;
@@ -2062,10 +2102,10 @@ static int changepw_cmd (int argc, char * const argv[]) {
 			salt_file = optarg;
 			break;
 		case 'i':
-			iterations = strtoul(optarg, NULL, 0);
+			iterations = strtoul_or_die(optarg, 0);
 			break;
 		case 'I':
-			iter_time = strtoul(optarg, NULL, 0);
+			iter_time = strtoul_or_die(optarg, 0);
 			break;
 		case 'N':
 			WDS_UNSET(hs_flags, HS_WDP_MASK);
@@ -2396,7 +2436,7 @@ static int erase_cmd(int argc, char * const argv[]) {
 			cipher_name = optarg;
 			break;
 		case 'I':
-			ul_tmp = strtoul(optarg, NULL, 0);
+			ul_tmp = strtoul_or_die(optarg, 0);
 			if (ul_tmp > UINT8_MAX) {
 				subcmd_usage(stderr, argv[0]);
 				fputs("Error: cipher-id out-of-range\n", stderr);
@@ -2411,7 +2451,7 @@ static int erase_cmd(int argc, char * const argv[]) {
 			keyfile = optarg;
 			break;
 		case 'l':
-			ul_tmp = strtoul(optarg, NULL, 0);
+			ul_tmp = strtoul_or_die(optarg, 0);
 			if (ul_tmp > UINT16_MAX) {
 				subcmd_usage(stderr, argv[0]);
 				fputs("Error: key-size out-of-range\n", stderr);

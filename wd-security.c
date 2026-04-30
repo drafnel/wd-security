@@ -750,9 +750,18 @@ struct wds_handle* wds_open (const char *device, const struct wds_opts *opts,
 
 	loglevel_env = getenv(WDS_LOGLEVEL_ENV);
 	if (loglevel_env) {
-		int level = DIE;
-		if (sscanf(loglevel_env, "%d", &level))
+		char *endptr;
+		long level;
+		errno = 0;
+		level = strtol(loglevel_env, &endptr, 10);
+		/* ensure no error, and *some* of the string was consumed */
+		if (!errno && endptr != loglevel_env) {
+			if (level > INT_MAX)
+				level = INT_MAX;
+			else if (level < INT_MIN)
+				level = INT_MIN;
 			wds_log_level(level);
+		}
 	}
 
 	fd = open(device, O_RDONLY | O_CLOEXEC);

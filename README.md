@@ -1,5 +1,5 @@
 
-# WD Security for Linux w/ auto-unlocking
+# WD Security for Linux
 
 Manage password protection of Western Digital external drives supported
 by the proprietary WD Security software.  All operations are compatible

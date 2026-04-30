@@ -498,7 +498,7 @@ Writing password hint to Handy Store Security Block...done.
 ====
 ----
 # wd-security handy-store set /dev/sdb label="My Book 25EE (6TB)"
-Writing drive label to Handy Store Security Block...done.
+Writing drive label to Handy Store User Block...done.
 ----
 ====
 

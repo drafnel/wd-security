@@ -15,7 +15,7 @@ jobs:
                 os: [ubuntu-latest, ubuntu-22.04, ubuntu-24.04-arm, ubuntu-22.04-arm]
         runs-on: ${{ matrix.os }}
         steps:
-            - uses: actions/checkout@v5
+            - uses: actions/checkout@v6
               with:
                   fetch-depth: 0
             - run: git show-ref
@@ -56,7 +56,7 @@ jobs:
         steps:
             - run: sudo apt-get update
             - run: sudo apt-get install build-essential debhelper asciidoc-base -y
-            - uses: actions/checkout@v5
+            - uses: actions/checkout@v6
               with:
                   fetch-depth: 0
             - run: git show-ref

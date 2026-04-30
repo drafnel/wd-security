@@ -16,7 +16,7 @@ jobs:
     adoc-build:
         runs-on: ubuntu-latest
         steps:
-            - uses: actions/checkout@v5
+            - uses: actions/checkout@v6
             - run: gem install --user-install asciidoctor
             - run: autoreconf --verbose --force --install --symlink
             - name: configure and generate ASCIIDOC manual

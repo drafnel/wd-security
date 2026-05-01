@@ -367,6 +367,10 @@ Show geometry of Handy Store.
 *handy-store* *set* [_OPTIONS_] _device_ _name_=_value_ [_name_=_value_ ...]::
 
 For each _name_/_value_ pair, set field _name_ to _value_ in Handy Store.
++
+The backup Security Block will only be updated if the salt and iterations
+values match those in the primary Security Block.  If they differ, or if
+the backup is missing, then it will not be written.
 
   Configurable Fields:::
 

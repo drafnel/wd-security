@@ -90,6 +90,7 @@
 #define HS_BKUP_RD     0x10
 #define HS_BKUP_WR     0x20
 #define HS_BKUP_SAFE   0x40
+#define HS_BKUP_UPDT   0x80
 
 #define HS_BKUP_DFLT   (HS_BKUP_WR | HS_BKUP_SAFE)
 
@@ -773,6 +774,19 @@ static int write_handy_store_security_block_backup (struct wds_handle *wds,
 				free(buf);
 				return err;
 			}
+
+			/* "update-only": salt and iterations must match */
+			if (WDS_IS_SET(flags, HS_BKUP_UPDT) &&
+			    (tmp.iterations != sb->iterations ||
+			     memcmp(tmp.salt, sb->salt, sizeof(tmp.salt))))
+			{
+				free(buf);
+				return WD_SECURITY_ESIG;
+			}
+		} else if (WDS_IS_SET(flags, HS_BKUP_UPDT)) {
+			/* "update-only": don't create backup if missing */
+			free(buf);
+			return WD_SECURITY_ESIG;
 		}
 
 		len = hc.length;
@@ -1599,7 +1613,7 @@ static int handy_store_set_cmd (const char *super, int argc,
 	wds_handle *wds;
 	int err;
 	int opt;
-	unsigned hs_flags = HS_WDP_AUTO | HS_BKUP_DFLT;
+	unsigned hs_flags = HS_WDP_AUTO | HS_BKUP_DFLT | HS_BKUP_UPDT;
 	const struct option long_options[] = {
 		{ "help", no_argument, NULL, 'h' },
 		{ "verbose", no_argument, NULL, 'v' },

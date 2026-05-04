@@ -52,10 +52,10 @@ char* strtrim (char *s) {
 	for (len = strlen(s); len && isspace((unsigned char)s[len-1]); len--)
 		;
 
-	s[len] = '\0';
-
 	if (head != s)
-		memmove(head, s, strlen(s) + 1);
+		memmove(head, s, len);
+
+	head[len] = '\0';
 
 	return head;
 }
